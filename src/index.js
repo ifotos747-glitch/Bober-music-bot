@@ -15,6 +15,7 @@ const radios = require('./radios');
 const alternatives = require('./alternatives');
 const sources = require('./sources');
 const youtubeOauth = require('./youtube-oauth');
+const youtubeDiagnostics = require('./youtube-diagnostics');
 const spotifyApi = require('./spotify-api');
 const always247 = require('./always247');
 const effectsStore = require('./effects');
@@ -233,6 +234,26 @@ client.on(Events.InteractionCreate, async interaction => {
       }
       adminOnly(interaction);
       await interaction.deferReply(ephemeral);
+      if (sub === 'diagnoza') {
+        const link = interaction.options.getString('link') || youtubeDiagnostics.DEFAULT_VIDEO;
+        const result = await youtubeDiagnostics.diagnose(link);
+        const category = result.type === 'ok' ? '✅ FRAGMENT AUDIO DOSTĘPNY' :
+          result.type === 'login' ? '⛔ YOUTUBE WYMAGA POTWIERDZENIA SESJI' :
+          result.type === '403' ? '⛔ YOUTUBE ZWRACA HTTP 403' :
+          result.type === 'format' ? '⚠️ BRAK FORMATU AUDIO' :
+          '⚠️ NIEUDANY TEST';
+        const lines = [
+          '🧪 **BOBER MUSIC BOT — test YouTube z hostingu**',
+          'Wynik: **' + category + '**',
+          'Klient: ' + cleanTitle(result.client),
+          'Wymuszone IPv4: **' + (result.ipv4 ? 'tak' : 'nie') + '**',
+          'Bajty testowe: ' + result.bytes,
+          result.message,
+          'Sukces nie gwarantuje odtworzenia całego filmu.',
+          'YouTube Data API/OAuth nie usuwają blokady strumieni audio.',
+        ];
+        return interaction.editReply({ content: lines.join('\n').slice(0,1900), allowedMentions:{parse:[]} });
+      }
       if (sub === 'konto') {
         const data = await youtubeOauth.account();
         return interaction.editReply({content:'📺 **Połączony kanał YouTube:** '+cleanTitle(data.title)+(data.id?'\nID: '+data.id:''), allowedMentions:{parse:[]}});
@@ -397,7 +418,7 @@ client.on(Events.InteractionCreate, async interaction => {
       const [yt, ff] = await Promise.all([probeTool(getYtdlpPath(), ['--version']), probeTool(getFFmpegPath(), ['-version'])]);
       const s = sessions.get(interaction.guild.id);
       const lines = [
-        '🛠️ **BOBER MUSIC BOT 4.0 — Diagnostyka audio i 24/7**',
+        '🛠️ **BOBER MUSIC BOT 4.0.1 — Diagnostyka audio i 24/7**',
         `Wersja uruchomiona: **${require('../package.json').version}**`,
         `Przypisane źródła alternatywne: **${alternatives.list(interaction.guild.id).length}**`,
         `Katalogi: Audius ${process.env.AUDIUS_ENABLED==='0'?'wyłączony':'włączony'}; Jamendo ${process.env.JAMENDO_CLIENT_ID?'skonfigurowany':'wymaga Client ID'}`,
