@@ -24,7 +24,6 @@ async function diagnose(link = DEFAULT_VIDEO, options = {}) {
   const client = (process.env.YOUTUBE_PLAYER_CLIENT || '').trim();
   const args = [
     ...youtubeArgs(client),
-    ...(forced ? ['--force-ipv4'] : []),
     '--test', '--no-simulate', '--no-part', '--retries', '0', '--fragment-retries', '0',
     '-f', process.env.YOUTUBE_FORMAT || 'bestaudio/best',
     '-o', '-', video.source,
