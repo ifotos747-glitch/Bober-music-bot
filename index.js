@@ -8,6 +8,7 @@ const required = [
   ['src/index.js', 'BOBER MUSIC BOT 4.0'],
   ['src/media.js', 'classifyYoutubeFailure'],
   ['src/queue-tools.js', 'function requeueFinished'],
+  ['src/youtube-diagnostics.js', 'function summarize'],
   ['src/favorites.js', 'MAX_FAVORITES = 30'],
   ['src/alternatives.js', 'function normalizeKey(input)'],
   ['src/sources.js', 'async function searchCatalog(query'],
