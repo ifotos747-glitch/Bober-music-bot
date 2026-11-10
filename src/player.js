@@ -9,6 +9,7 @@ const {
 } = require('@discordjs/voice');
 const { listFiles, MUSIC_DIR, getFFmpegPath, getYtdlpPath, youtubeArgs, isYoutubeChallenge, classifyYoutubeFailure } = require('./media');
 const effectsStore = require('./effects');
+const queueTools = require('./queue-tools');
 const TEST_OGG_FILE = path.join(MUSIC_DIR, 'test-dzwiek.ogg'); // diag-ogg-opus-v2.2
 
 const sessions = new Map();
@@ -29,6 +30,8 @@ class MusicSession {
     this.textChannel = textChannel;
     this.queue = [];
     this.current = null;
+    this.repeatMode = 'off'; // off | one | all, na czas bieżącej sesji
+    this.skipRepeat = false;
     this.volume = 100;
     this.effects = effectsStore.read(guild.id);
     this.resource = null;
@@ -80,9 +83,14 @@ class MusicSession {
         // Koniec/zamknięcie streamu; daj rozgłośni chwilę na ponowne połączenie.
         this.radio247RetryAt = Date.now() + 5000;
       }
+      const finished = this.current, failed = this.failedCurrent, skipped = this.skipRepeat;
       this.cleanProcesses();
       this.current = null;
       this.resource = null;
+      this.skipRepeat = false;
+      queueTools.requeueFinished(this.queue, finished, this.repeatMode, {
+        failed, skipped, continuous: Boolean(this.alwaysOn || this.autodj),
+      });
       this.startNext();
     });
     this.player.on('error', e => {
@@ -312,8 +320,10 @@ class MusicSession {
     const track = this.current;
     if (track && track.kind !== 'diagnostic') {
       this.queue.unshift({ ...track });
+      this.skipRepeat = true;
       this.cleanProcesses();
       if (!this.player.stop(true)) {
+        this.skipRepeat = false;
         this.current = null;
         this.resource = null;
         void this.startNext();
@@ -382,8 +392,10 @@ class MusicSession {
   }
   skip() {
     if (!this.current) return false;
+    this.skipRepeat = true;
     this.cleanProcesses();
     if (!this.player.stop(true)) {
+      this.skipRepeat = false;
       this.current = null;
       this.resource = null;
       void this.startNext();
