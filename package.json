@@ -1,8 +1,8 @@
 {
   "name": "bober-music-bot",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "private": true,
-  "description": "BOBER MUSIC BOT 4.0 MEGA MUSIC UPDATE — queue management, personal favorites, repeat, 24/7 radio, Audius/Jamendo, Spotify and YouTube metadata",
+  "description": "BOBER MUSIC BOT 4.0.1 — private YouTube host diagnostics and optional IPv4 test, retaining all 4.0 features",
   "engines": {
     "node": ">=24.17.0"
   },
@@ -11,7 +11,7 @@
     "start": "node index.js",
     "register": "node src/register.js",
     "install:ytdlp": "node tools/install-ytdlp.js",
-    "check": "node --check index.js && node --check src/index.js && node --check src/shared.js && node --check src/register.js && node --check src/player.js && node --check src/media.js && node --check src/alternatives.js && node --check src/sources.js && node --check src/youtube-oauth.js && node --check src/spotify-api.js && node --check tools/youtube-oauth-desktop.js && node --check src/queue-tools.js && node --check src/favorites.js && node --check src/store.js && node --check src/radios.js && node --check src/always247.js && node --check src/effects.js && node --check tools/install-ytdlp.js && node --test tests/*.test.js",
+    "check": "node --check index.js && node --check src/index.js && node --check src/shared.js && node --check src/register.js && node --check src/player.js && node --check src/media.js && node --check src/alternatives.js && node --check src/sources.js && node --check src/youtube-diagnostics.js && node --check src/youtube-oauth.js && node --check src/spotify-api.js && node --check tools/youtube-oauth-desktop.js && node --check src/queue-tools.js && node --check src/favorites.js && node --check src/store.js && node --check src/radios.js && node --check src/always247.js && node --check src/effects.js && node --check tools/install-ytdlp.js && node --test tests/*.test.js",
     "oauth:youtube": "node tools/youtube-oauth-desktop.js"
   },
   "dependencies": {

@@ -88,7 +88,9 @@ const commands = [
   new SlashCommandBuilder().setName('youtube').setDescription('YouTube OAuth — dane konta, tylko odczyt')
     .addSubcommand(s => s.setName('status').setDescription('Sprawdź konfigurację OAuth 2.0'))
     .addSubcommand(s => s.setName('konto').setDescription('Sprawdź połączony kanał YouTube (administrator)'))
-    .addSubcommand(s => s.setName('playlisty').setDescription('Lista playlist konta (administrator)')),
+    .addSubcommand(s => s.setName('playlisty').setDescription('Lista playlist konta (administrator)'))
+    .addSubcommand(s => s.setName('diagnoza').setDescription('Test audio YouTube z IP hostingu (administrator)')
+      .addStringOption(o => o.setName('link').setDescription('Publiczny link do filmu YouTube (opcjonalnie)'))),
   new SlashCommandBuilder().setName('kolejka').setDescription('BOBER 4.0 — zarządzanie oczekującymi utworami')
     .addSubcommand(s => s.setName('usun').setDescription('Usuń utwór z kolejki (nie przerywa aktualnego)')
       .addIntegerOption(o => o.setName('numer').setDescription('Numer w /queue').setMinValue(1).setMaxValue(100).setRequired(true)))
