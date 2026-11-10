@@ -7,7 +7,7 @@ test('katalog główny wskazuje komplet plików 4.0', () => {
   const entry = fs.readFileSync(path.join(root,'index.js'), 'utf8');
   assert.match(entry, /START BOBER MUSIC BOT/);
   assert.match(fs.readFileSync(path.join(root,'src/index.js'),'utf8'), /BOBER MUSIC BOT 4.0/);
-  assert.equal(JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8')).version, '4.0.0');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8')).version, '4.0.1');
 });
 test('testaudio jest zarejestrowane dokładnie raz', () => {
   const source = fs.readFileSync(path.join(root,'src/shared.js'), 'utf8');
