@@ -1,0 +1,27 @@
+{
+  "name": "bober-music-bot",
+  "version": "3.0.0",
+  "private": true,
+  "description": "BOBER MUSIC BOT 3.0 — Spotify links to licensed audio sources; GitHub deploy, radio 24/7, DJ and EQ",
+  "engines": {
+    "node": ">=24.17.0"
+  },
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "register": "node src/register.js",
+    "install:ytdlp": "node tools/install-ytdlp.js",
+    "check": "node --check index.js && node --check src/index.js && node --check src/shared.js && node --check src/register.js && node --check src/player.js && node --check src/media.js && node --check src/alternatives.js && node --check src/sources.js && node --check src/store.js && node --check src/radios.js && node --check src/always247.js && node --check src/effects.js && node --check tools/install-ytdlp.js && node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "@discordjs/voice": "^0.19.2",
+    "discord.js": "^14.27.0",
+    "dotenv": "^17.2.3",
+    "ffmpeg-static": "^5.2.0",
+    "opusscript": "^0.1.1",
+    "libsodium-wrappers": "^0.7.15"
+  },
+  "allowScripts": {
+    "ffmpeg-static": true
+  }
+}

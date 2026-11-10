@@ -1,0 +1,23 @@
+# Secrets - token Discord MUST NEVER be committed
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.jks
+# Generated/runtime files
+node_modules/
+data/
+npm-debug.log*
+*.log
+coverage/
+.cache/
+# Large audio files belong on hosting, not in repository
+music/*
+!music/demo.wav
+!music/test-dzwiek.ogg
+# Downloads and large generated tools belong on the hosting
+/tools/yt-dlp_linux
+/tools/yt-dlp.exe
+/tools/bgutil-provider/
+/tools/yt-dlp-plugins/

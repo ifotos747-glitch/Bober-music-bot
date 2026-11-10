@@ -1,0 +1,21 @@
+name: BOBER MUSIC BOT — Testy
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Pobierz kod
+        uses: actions/checkout@v4
+      - name: Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Instalacja pakietów
+        run: npm install --no-audit --no-fund
+      - name: Testy
+        run: npm run check
