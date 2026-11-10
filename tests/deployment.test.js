@@ -3,11 +3,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const root = path.join(__dirname, '..');
-test('katalog główny wskazuje komplet plików 3.0', () => {
+test('katalog główny wskazuje komplet plików 4.0', () => {
   const entry = fs.readFileSync(path.join(root,'index.js'), 'utf8');
   assert.match(entry, /START BOBER MUSIC BOT/);
-  assert.match(fs.readFileSync(path.join(root,'src/index.js'),'utf8'), /BOBER MUSIC BOT 3.0/);
-  assert.equal(JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8')).version, '3.0.0');
+  assert.match(fs.readFileSync(path.join(root,'src/index.js'),'utf8'), /BOBER MUSIC BOT 4.0/);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8')).version, '4.0.0');
 });
 test('testaudio jest zarejestrowane dokładnie raz', () => {
   const source = fs.readFileSync(path.join(root,'src/shared.js'), 'utf8');
@@ -60,15 +60,15 @@ test('komenda alternatywa oraz katalog zrodla', () => {
   assert.match(entry, /src\/alternatives\.js/);
 });
 
-test('22 komendy, w tym nowe /zrodla', () => {
+test('komendy /zrodla i nowe komendy 4.0', () => {
   const text=fs.readFileSync(path.join(root,'src/shared.js'),'utf8');
-  assert.match(text,/setName\('zrodla'\)/);
+  for (const command of ['zrodla','kolejka','powtorz','ulubione']) assert.match(text, new RegExp("setName\\('"+command+"'\\)"));
   assert.match(text,/setName\('szukaj'\)/);
   assert.match(text,/setName\('graj'\)/);
   assert.match(fs.readFileSync(path.join(root,'src/player.js'),'utf8'), /track.kind === 'stream'/);
 });
 
-test('3.0: GitHub CI i dokumentacja wdrożenia nie wymagają sekretów', () => {
+test('4.0: GitHub CI i dokumentacja wdrożenia nie wymagają sekretów', () => {
   const github = fs.readFileSync(path.join(root,'.github/workflows/test.yml'),'utf8');
   const gitignore = fs.readFileSync(path.join(root,'.gitignore'),'utf8');
   assert.match(github,/npm run check/);
