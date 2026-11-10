@@ -15,7 +15,7 @@ const commands = [
   new SlashCommandBuilder().setName('files').setDescription('Lista plików audio w music/'),
   new SlashCommandBuilder().setName('volume').setDescription('Głośność muzyki')
     .addIntegerOption(o => o.setName('level').setDescription('Od 0 do 200%').setMinValue(0).setMaxValue(200).setRequired(true)),
-  new SlashCommandBuilder().setName('help').setDescription('Pomoc Bober Music Bot 3.0'),
+  new SlashCommandBuilder().setName('help').setDescription('Pomoc Bober Music Bot 4.0'),
   new SlashCommandBuilder().setName('panel').setDescription('Wyświetl przyciski sterowania muzyką'),
   new SlashCommandBuilder().setName('autodj').setDescription('Automatycznie odtwarzaj pliki music/')
     .addStringOption(o => o.setName('mode').setDescription('Włącz lub wyłącz AutoDJ')
@@ -89,6 +89,25 @@ const commands = [
     .addSubcommand(s => s.setName('status').setDescription('Sprawdź konfigurację OAuth 2.0'))
     .addSubcommand(s => s.setName('konto').setDescription('Sprawdź połączony kanał YouTube (administrator)'))
     .addSubcommand(s => s.setName('playlisty').setDescription('Lista playlist konta (administrator)')),
+  new SlashCommandBuilder().setName('kolejka').setDescription('BOBER 4.0 — zarządzanie oczekującymi utworami')
+    .addSubcommand(s => s.setName('usun').setDescription('Usuń utwór z kolejki (nie przerywa aktualnego)')
+      .addIntegerOption(o => o.setName('numer').setDescription('Numer w /queue').setMinValue(1).setMaxValue(100).setRequired(true)))
+    .addSubcommand(s => s.setName('przenies').setDescription('Przesuń utwór na inną pozycję')
+      .addIntegerOption(o => o.setName('z').setDescription('Numer utworu').setMinValue(1).setMaxValue(100).setRequired(true))
+      .addIntegerOption(o => o.setName('na').setDescription('Nowa pozycja').setMinValue(1).setMaxValue(100).setRequired(true)))
+    .addSubcommand(s => s.setName('tasuj').setDescription('Losowo przetasuj oczekujące utwory'))
+    .addSubcommand(s => s.setName('wyczysc').setDescription('Usuń oczekujące utwory, nie przerywaj bieżącego')),
+  new SlashCommandBuilder().setName('powtorz').setDescription('BOBER 4.0 — powtarzanie utworów w sesji')
+    .addStringOption(o => o.setName('tryb').setDescription('Wyłącz, powtarzaj utwór lub całą kolejkę')
+      .addChoices({ name: 'Wyłączone', value: 'off' },
+        { name: 'Jeden utwór', value: 'one' }, { name: 'Cała kolejka', value: 'all' })),
+  new SlashCommandBuilder().setName('ulubione').setDescription('BOBER 4.0 — Twoje prywatne ulubione na tym serwerze')
+    .addSubcommand(s => s.setName('dodaj').setDescription('Zapisz aktualnie odtwarzany utwór'))
+    .addSubcommand(s => s.setName('lista').setDescription('Wyświetl swoje ulubione utwory'))
+    .addSubcommand(s => s.setName('graj').setDescription('Dodaj ulubiony utwór do kolejki')
+      .addIntegerOption(o => o.setName('numer').setDescription('Numer z /ulubione lista').setMinValue(1).setMaxValue(30).setRequired(true)))
+    .addSubcommand(s => s.setName('usun').setDescription('Usuń utwór ze swoich ulubionych')
+      .addIntegerOption(o => o.setName('numer').setDescription('Numer z /ulubione lista').setMinValue(1).setMaxValue(30).setRequired(true))),
   new SlashCommandBuilder().setName('status').setDescription('Stan dźwięku, FFmpeg i YouTube')
 ];
 module.exports = { commands };
