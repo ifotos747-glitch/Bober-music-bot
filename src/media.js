@@ -61,9 +61,12 @@ function getFFmpegPath() {
 const baseYtArgs = ['--ignore-config', '--no-playlist', '--no-progress', '--no-warnings', '--socket-timeout', '15', '--js-runtimes', 'node', '--remote-components', 'ejs:github'];
 const ALT_YT_CLIENTS = 'web_safari,web_embedded';
 function youtubeArgs(client = '') {
-  if (!client) return [...baseYtArgs];
+  // Test opcji IPv4: nie obchodzi blokad YouTube, ale pomaga wykryć problemy
+  // z różną reputacją IPv4/IPv6 hostingu. Domyślnie bez zmian.
+  const args = [...baseYtArgs, ...(process.env.YOUTUBE_FORCE_IPV4 === '1' ? ['--force-ipv4'] : [])];
+  if (!client) return args;
   if (!/^[a-z_]+(?:,[a-z_]+)*$/.test(client)) throw new Error('Niepoprawne YOUTUBE_PLAYER_CLIENT.');
-  return [...baseYtArgs, '--extractor-args', `youtube:player_client=${client}`];
+  return [...args, '--extractor-args', `youtube:player_client=${client}`];
 }
 function isYoutubeChallenge(log) {
   return /sign in to confirm|not a bot|unable to extract.*(challenge|player)|http error 429/i.test(String(log));
