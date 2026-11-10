@@ -1,35 +1,41 @@
-# 🎵 BOBER MUSIC BOT 3.0 — start w Bot-Hosting.net
+# 🎵 BOBER MUSIC BOT 4.0 — Bot-Hosting.net
 
-**Uruchamianie:** Node.js 24, `index.js`. Pakiety: `npm install --no-fund --no-audit`.
+**Start:** Node.js 24+ · Startup File `index.js` · `npm install --no-audit --no-fund`.
 
-### Jeżeli aktualizujesz obecny serwer 2.7
+## Aktualizacja z wersji 3.0.1
 
-1. Zrób kopię zapasową **.env, data/ i music/**.
-2. W panelu przejdź do **Pliki**, naciśnij ikonę **GitHub** i połącz repozytorium.
-3. Wybierz gałąź `main` i metodę **Merge / Scal**.
-4. **Nie używaj Replace all files** (usuwa dane hostingu).
-5. Upewnij się, że `index.js` jest ustawiony jako **Startup File**.
-6. Uruchom ponownie i sprawdź `/status`, `/zrodla status`, `/testaudio`.
+1. **Zrób kopię**: `.env`, `data/` i `music/`.
+2. Otwórz Bot-Hosting.net → **Files / Pliki** → integracja **GitHub**.
+3. Wybierz repo `ifotos747-glitch/Bober-music-bot`, gałąź `main` i opcję **Merge / Scal**.
+4. **Nie wybieraj „Replace all files” / „Zastąp wszystkie pliki”**, bo może usunąć `.env`, ulubione, zapisane playlisty i własne pliki MP3.
+5. Sprawdź Startup File: `index.js`. Zainstaluj zależności, jeśli panel nie zrobił tego sam, i **Restart**.
+6. Konsola powinna pokazać `START BOBER MUSIC BOT 4.0.0` oraz udaną rejestrację komend Discord. Przetestuj `/status` i `/testaudio`.
 
-### GitHub
+## Nowe funkcje 4.0
 
-Kod możesz trzymać w prywatnym repozytorium. **Nie wysyłaj `.env` ani tokenu bota do GitHub!**
-Trzymaj zmienne w pliku `.env` tylko na serwerze lub jako sekrety w panelu. `.gitignore` ukrywa również prywatne pliki `data/` i muzykę `music/`.
+- `/kolejka usun numer:1` — usuń oczekujący utwór.
+- `/kolejka przenies z:2 na:1` — zmień kolejność.
+- `/kolejka tasuj`, `/kolejka wyczysc` — tasuj lub wyczyść przyszłe utwory; bieżący odtwarza się nadal.
+- `/powtorz tryb:one|all|off` — powtórz utwór, kolejkę albo wyłącz.
+- `/ulubione dodaj` — zapisz bieżący utwór; `/ulubione lista`, `/ulubione graj numer:1`, `/ulubione usun numer:1`.
+- `/panel` — dwa nowe przyciski (Tasuj, Powtarzanie).
 
-### Muzyka ze Spotify
+Komendy zmiany kolejki i powtarzania wymagają przebywania z botem na kanale głosowym. Powtarzanie nie zapętla błędnego audio, pominiętych utworów, radia 24/7 ani plików diagnostycznych.
 
-`/play` rozpoznaje tytuł i wykonawcę z linku Spotify, sprawdza mapowania, pliki lokalne, Audius i Jamendo. Gdy nic nie pasuje jednoznacznie, użyj `/zrodla szukaj` i `/zrodla graj` albo `/alternatywa add`. Spotify nie jest tu źródłem audio.
+## Ustawienia, które muszą pozostać prywatne
 
-### Weryfikacja API
-
-`/zrodla status` testuje API z IP hostingu; `/status` sprawdza FFmpeg, yt-dlp i Voice. Test API nie potwierdza praw do odtwarzania utworu.
-
-### Dodatkowa konfiguracja `.env`
-
+Nie usuwaj dotychczasowego `DISCORD_TOKEN`, `CLIENT_ID`, `GUILD_ID`. Jeżeli masz działające Google OAuth, zachowaj również:
 ```ini
-AUDIUS_ENABLED=1
-BOBER_YOUTUBE_FALLBACK=0
-# JAMENDO_CLIENT_ID=TU_WLASNY_ID
+YOUTUBE_OAUTH_CLIENT_ID=...
+YOUTUBE_OAUTH_CLIENT_SECRET=...
+YOUTUBE_OAUTH_REFRESH_TOKEN=...
 ```
+**Nie wpisuj prawdziwych wartości w GitHub, zgłoszeniach ani na czacie.**
 
-Jeśli nie ma źródła, bot **nie obchodzi DRM ani blokady YouTube**, nie podmienia utworów losowo.
+Dla Spotify i katalogów Audius/Jamendo zachowaj dotychczasowe zmienne środowiskowe. `data/` przechowuje dane per serwer, a `data/favorites-*.json` — nowe ulubione per użytkownik. Oba katalogi nie są synchronizowane na GitHub.
+
+## Po aktualizacji
+
+Uruchom kolejno: `/status`, `/help`, `/ulubione lista`, `/play source:demo.wav`, `/ulubione dodaj`, `/kolejka tasuj`, `/powtorz tryb:one` i `/panel`.
+
+Pamiętaj: OAuth YouTube/Spotify umożliwia odczyt danych, **nie** bezpośrednie strumieniowanie muzyki ani obchodzenie HTTP 403. 24/7 wymaga stale działającego hostingu.
