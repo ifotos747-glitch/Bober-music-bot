@@ -2,6 +2,7 @@
 // TYLKO lokalny Windows/macOS/Linux: bezpieczne OAuth Desktop + PKCE + 127.0.0.1.
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),crypto=require('node:crypto');
 const {createInterface}=require('node:readline/promises');
+const {spawn}=require('node:child_process');
 const TOKEN_URL='https://oauth2.googleapis.com/token';
 const DEST=path.resolve(__dirname,'..','.env.youtube-oauth.local');
 async function main(){
@@ -39,8 +40,23 @@ async function main(){
   for(const [k,v] of Object.entries({client_id:creds.client_id,redirect_uri:redirectUri,response_type:'code',
     scope:'https://www.googleapis.com/auth/youtube.readonly',access_type:'offline',prompt:'consent',
     state,code_challenge:challenge,code_challenge_method:'S256'}))auth.searchParams.set(k,v);
-  console.log('Otwórz na TYM SAMYM komputerze adres:');
-  console.log(auth.toString());
+  // Adres jest długi i zawiera ampersandy. Ręczne zaznaczanie go w terminalu
+  // może zgubić parametry, w szczególności response_type=code.
+  // Windows: otwórz CAŁY adres automatycznie w domyślnej przeglądarce.
+  if (process.platform === 'win32') {
+    console.log('Otwieram okno autoryzacji Google w domyślnej przeglądarce...');
+    const browser=spawn('rundll32.exe',['url.dll,FileProtocolHandler',auth.toString()],
+      {windowsHide:true,stdio:'ignore'});
+    browser.once('error',err=>{
+      console.warn('Nie udało się otworzyć przeglądarki automatycznie: '+err.message);
+      console.log('Zapasowy pełny adres (skopiuj CAŁOŚĆ):');
+      console.log(auth.toString());
+    });
+    browser.unref();
+  } else {
+    console.log('Otwórz na TYM SAMYM komputerze adres:');
+    console.log(auth.toString());
+  }
   let timer;
   try{
     const code=await Promise.race([callback,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Minął czas autoryzacji.')),5*60*1000);})]);
