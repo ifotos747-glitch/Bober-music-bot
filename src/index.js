@@ -9,6 +9,8 @@ const {
 const { sessions, lastGuildErrors, getOrCreateSession, cleanTitle, MAX_QUEUE } = require('./player');
 const { resolveTrack, restoreSaved, listFiles, getYtdlpPath, getFFmpegPath, ensureAudioTools, probeTool } = require('./media');
 const playlists = require('./store');
+const favorites = require('./favorites');
+const queueTools = require('./queue-tools');
 const radios = require('./radios');
 const alternatives = require('./alternatives');
 const sources = require('./sources');
@@ -25,13 +27,16 @@ if (!token || token.startsWith('NOWY_TOKEN') || token.startsWith('WPISZ_')) {
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
 const ephemeral = { flags: MessageFlags.Ephemeral };
 const help = [
-  '**🎵 BOBER MUSIC BOT 3.0 SMART MUSIC & GITHUB**',
+  '**🎵 BOBER MUSIC BOT 4.0 — MEGA MUSIC UPDATE**',
   '`/play source:<link YouTube / tytuł / radio / demo.wav>`',
   '`/search query:<tytuł>` — znajdź utwór na YouTube',
   '`/panel` — przyciski ⏸️ ▶️ ⏭️ ⏹️',
   '`/testaudio` — 12-sekundowy test dźwięku bez FFmpeg i YouTube',
   '`/pause` `/resume` `/skip` `/stop` `/volume`',
   '`/queue` `/nowplaying` `/files`',
+  '`/kolejka usun|przenies|tasuj|wyczysc` — zarządzanie utworami',
+  '`/powtorz tryb:off|one|all` — powtarzanie muzyki',
+  '`/ulubione dodaj|lista|graj|usun` — Twoja biblioteka utworów',
   '`/playlist save|load|list|delete` — zapisane kolejki',
   '`/autodj mode:on|off` — zapętlenie plików w music/',
   '`/status` — narzędzia yt-dlp / FFmpeg',
@@ -57,6 +62,9 @@ function controls() {
     new ButtonBuilder().setCustomId('bm2:resume').setLabel('Wznów').setEmoji('▶️').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('bm2:skip').setLabel('Pomiń').setEmoji('⏭️').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('bm2:stop').setLabel('Stop').setEmoji('⏹️').setStyle(ButtonStyle.Danger)
+  ), new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('bm2:shuffle').setLabel('Tasuj kolejkę').setEmoji('🔀').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('bm2:repeat').setLabel('Zmień powtarzanie').setEmoji('🔁').setStyle(ButtonStyle.Primary)
   )];
 }
 function radioPanel(guildId) {
@@ -117,6 +125,12 @@ async function executeControl(interaction, action) {
   if (action === 'pause') return session.player.pause() ? '⏸️ Pauza.' : 'Nie można wstrzymać.';
   if (action === 'resume') return session.player.unpause() ? '▶️ Wznowiono.' : 'Nie można wznowić.';
   if (action === 'skip') return session.skip() ? '⏭️ Pominięto.' : 'Nie ma utworu do pominięcia.';
+  if (action === 'shuffle') { const n = queueTools.shuffle(session.queue); return '🔀 Przetasowano ' + n + ' oczekujących utworów.'; }
+  if (action === 'repeat') {
+    const modes = ['off', 'one', 'all'];
+    session.repeatMode = modes[(modes.indexOf(session.repeatMode) + 1) % modes.length];
+    return '🔁 Powtarzanie: ' + ({off:'wyłączone', one:'jeden utwór', all:'cała kolejka'}[session.repeatMode]);
+  }
   if (action === 'stop') { always247.remove(interaction.guild.id); session.destroy(); return '⏹️ Zatrzymano, wyłączono 24/7 i rozłączono bota.'; }
   throw new Error('Nieznana akcja.');
 }
@@ -163,7 +177,7 @@ function check247() {
   for (const saved of always247.list()) void ensure247Running(saved);
 }
 client.once(Events.ClientReady, c => {
-  console.log(`✅ BOBER MUSIC BOT 3.0 SMART MUSIC & GITHUB online: ${c.user.tag}`);
+  console.log(`✅ BOBER MUSIC BOT 4.0 MEGA MUSIC UPDATE online: ${c.user.tag}`);
   setTimeout(check247, 1500).unref?.();
   setInterval(check247, 60_000).unref?.();
 });
@@ -383,7 +397,7 @@ client.on(Events.InteractionCreate, async interaction => {
       const [yt, ff] = await Promise.all([probeTool(getYtdlpPath(), ['--version']), probeTool(getFFmpegPath(), ['-version'])]);
       const s = sessions.get(interaction.guild.id);
       const lines = [
-        '🛠️ **BOBER MUSIC BOT 3.0 — Diagnostyka audio, radia, DJ i 24/7**',
+        '🛠️ **BOBER MUSIC BOT 4.0 — Diagnostyka audio i 24/7**',
         `Wersja uruchomiona: **${require('../package.json').version}**`,
         `Przypisane źródła alternatywne: **${alternatives.list(interaction.guild.id).length}**`,
         `Katalogi: Audius ${process.env.AUDIUS_ENABLED==='0'?'wyłączony':'włączony'}; Jamendo ${process.env.JAMENDO_CLIENT_ID?'skonfigurowany':'wymaga Client ID'}`,
@@ -393,6 +407,8 @@ client.on(Events.InteractionCreate, async interaction => {
         `Tryb 24/7: **${always247.read(interaction.guild.id)?.mode || 'wyłączony'}**`,
         `Equalizer: **${effectsStore.read(interaction.guild.id).eqPreset}**`,
         `DJ: **${effectsStore.read(interaction.guild.id).dj}**`,
+        `Powtarzanie: **${s?.repeatMode || 'off'}**`,
+        `Utwory w kolejce: **${s?.queue.length || 0}**`,
         `Discord Voice: \`${s?.connection.state.status || 'nie połączono'}\``,
         `Odtwarzacz: \`${s?.player.state.status || 'nieaktywny'}\``,
         `Odtworzone (ms): ${s?.resource?.playbackDuration || 0}`,
@@ -427,7 +443,78 @@ client.on(Events.InteractionCreate, async interaction => {
     if (name === 'panel') {
       const session = sessions.get(interaction.guild.id);
       if (!session) return interaction.reply({ content: 'Najpierw użyj `/play`.', ...ephemeral });
-      return interaction.reply({ content: `🎚️ **Panel muzyczny**\n▶️ Teraz: **${cleanTitle(session.current?.title || 'cisza')}**\n🎼 Oczekuje: ${session.queue.length}`, components: controls(), allowedMentions: { parse: [] } });
+      return interaction.reply({ content: `🎚️ **BOBER 4.0 — Panel muzyczny**\n▶️ Teraz: **${cleanTitle(session.current?.title || 'cisza')}**\n🎼 Oczekuje: ${session.queue.length}\n🔁 Powtarzanie: ${session.repeatMode}`, components: controls(), allowedMentions: { parse: [] } });
+    }
+    if (name === 'kolejka') {
+      const s = sessions.get(interaction.guild.id);
+      if (!sameVoice(interaction, s)) throw new Error('Dołącz do kanału głosowego bota, aby zarządzać kolejką.');
+      const sub = interaction.options.getSubcommand();
+      if (sub === 'usun') {
+        const removed = queueTools.remove(s.queue, interaction.options.getInteger('numer', true));
+        return interaction.reply({ content: '🗑️ Usunięto z kolejki: **' + cleanTitle(removed.title) + '**', allowedMentions: { parse: [] } });
+      }
+      if (sub === 'przenies') {
+        const from = interaction.options.getInteger('z', true);
+        const to = interaction.options.getInteger('na', true);
+        const moved = queueTools.move(s.queue, from, to);
+        return interaction.reply({ content: '↕️ Przeniesiono **' + cleanTitle(moved.title) + '** z ' + from + ' na ' + to + '.', allowedMentions: { parse: [] } });
+      }
+      if (sub === 'tasuj') {
+        const count = queueTools.shuffle(s.queue);
+        return interaction.reply({ content: '🔀 Przetasowano ' + count + ' utworów. Bieżący utwór gra dalej.', allowedMentions: { parse: [] } });
+      }
+      if (sub === 'wyczysc') {
+        const count = queueTools.clear(s.queue);
+        return interaction.reply({ content: '🧹 Usunięto ' + count + ' oczekujących utworów. Bieżący utwór gra dalej.', allowedMentions: { parse: [] } });
+      }
+    }
+    if (name === 'powtorz') {
+      const s = sessions.get(interaction.guild.id);
+      if (!s) throw new Error('Najpierw użyj /play.');
+      const mode = interaction.options.getString('tryb');
+      if (mode) {
+        if (!sameVoice(interaction, s)) throw new Error('Dołącz do kanału głosowego bota.');
+        if (!['off', 'one', 'all'].includes(mode)) throw new Error('Nieznany tryb powtarzania.');
+        s.repeatMode = mode;
+      }
+      return interaction.reply({ content: '🔁 Powtarzanie: **' +
+        ({off:'wyłączone', one:'bieżący utwór', all:'cała kolejka'}[s.repeatMode]) +
+        '**. Nie powtarzamy radia, testu OGG ani nieudanych lub pominiętych utworów.', ...ephemeral });
+    }
+    if (name === 'ulubione') {
+      const sub = interaction.options.getSubcommand();
+      const guildId = interaction.guild.id, userId = interaction.user.id;
+      if (sub === 'lista') {
+        const tracks = favorites.list(guildId, userId);
+        const rows = tracks.map((t, i) => (i + 1) + '. ' + cleanTitle(t.title) + ' [' + t.kind + ']').join('\n');
+        return interaction.reply({ content: ('❤️ **Twoje ulubione (' + tracks.length + '/' + favorites.MAX_FAVORITES +
+          ')**\n' + (rows || 'Nie masz jeszcze ulubionych. Użyj /ulubione dodaj podczas odtwarzania.')).slice(0, 1900),
+          ...ephemeral, allowedMentions: { parse: [] } });
+      }
+      if (sub === 'dodaj') {
+        const track = sessions.get(guildId)?.current;
+        if (!track) throw new Error('Aktualnie nic nie gra.');
+        const saved = favorites.add(guildId, userId, track);
+        return interaction.reply({ content: '❤️ Dodano **' + cleanTitle(saved.track.title) +
+          '** do Twoich ulubionych (' + saved.count + '/30).', ...ephemeral, allowedMentions: { parse: [] } });
+      }
+      const number = interaction.options.getInteger('numer', true);
+      if (sub === 'usun') {
+        const removed = favorites.remove(guildId, userId, number);
+        return interaction.reply({ content: '🗑️ Usunięto z Twoich ulubionych: **' +
+          cleanTitle(removed.title) + '**', ...ephemeral, allowedMentions: { parse: [] } });
+      }
+      if (sub === 'graj') {
+        const vc = await checkVoice(interaction);
+        const selected = favorites.get(guildId, userId, number);
+        const track = restoreSaved(selected); // od nowa weryfikuje źródło przed uruchomieniem
+        await interaction.deferReply();
+        await ensureAudioTools(track.kind);
+        const s = getOrCreateSession(interaction.guild, vc, interaction.channel);
+        s.enqueue(track);
+        return interaction.editReply({ content: '❤️ ▶️ Dodano ulubiony utwór: **' +
+          cleanTitle(track.title) + '**', allowedMentions: { parse: [] } });
+      }
     }
     if (name === 'playlist') {
       const sub = interaction.options.getSubcommand();
