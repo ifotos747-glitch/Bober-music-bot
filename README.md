@@ -48,3 +48,13 @@ npm run check
 GitHub Actions uruchamia `npm run check` na gałęziach i pull requestach. Testy modułów weryfikują kolejkę, powtarzanie i izolację ulubionych. Testy automatyczne nie zastępują testu żywego połączenia z Discord Voice i dostępności strumieni na Bot-Hosting.net.
 
 Nie publikuj plików `.env*`, `data/`, Client Secret ani tokenów. Pliki zawierające te dane są ignorowane przez `.gitignore`.
+
+## Diagnostyka YouTube 4.0.1
+
+Jeśli YouTube zgłasza „Sign in to confirm you're not a bot”, użyj (jako administrator serwera) `/youtube diagnoza` albo `/youtube diagnoza link:https://www.youtube.com/watch?v=o54P8p-2LDk`.
+
+Komenda próbuje pobrać tylko **krótki fragment** audio na tym samym hostingu, przy użyciu obecnego klienta yt-dlp. Zwraca jedynie kategorię błędu, informację o wybranym kliencie i liczbie bajtów — bez surowych logów, URL-e nie są udostępniane, nie są wymagane cookies ani tokeny konta Google.
+
+Opcjonalny test IPv4: na hostingu w prywatnym `.env` ustaw `YOUTUBE_FORCE_IPV4=1`, zapisz i uruchom bota ponownie. `/youtube diagnoza` pokaże, czy to pomogło. Nie zmieniaj tokenów OAuth. Jeżeli nie ma poprawy, usuń tę zmienną albo ustaw `0`.
+
+**Ważne:** Nie ma gwarancji odblokowania IP hostingu. OAuth YouTube Data API nie uprawnia do pobierania audio ani nie usuwa blokady odtwarzania; respektuj warunki korzystania z usług.
