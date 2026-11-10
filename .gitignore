@@ -21,3 +21,9 @@ music/*
 /tools/yt-dlp.exe
 /tools/bgutil-provider/
 /tools/yt-dlp-plugins/
+
+# Prywatne pliki OAuth Google / Spotify — nigdy na GitHub
+.env.youtube-oauth.local
+client_secret*.json
+oauth-client*.json
+spotify-client*.json

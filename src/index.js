@@ -12,6 +12,8 @@ const playlists = require('./store');
 const radios = require('./radios');
 const alternatives = require('./alternatives');
 const sources = require('./sources');
+const youtubeOauth = require('./youtube-oauth');
+const spotifyApi = require('./spotify-api');
 const always247 = require('./always247');
 const effectsStore = require('./effects');
 const { VoiceConnectionStatus, entersState } = require('@discordjs/voice');
@@ -37,6 +39,8 @@ const help = [
   '`/radio add|remove` — zarządzanie stacjami (administrator)',
   '`/alternatywa add|remove|list` — legalne audio zastępcze dla linków Spotify/YouTube',
   '`/zrodla status` — sprawdź dostęp do Audius/Jamendo na hostingu',
+  '`/spotify status|utwor` — metadane Spotify Web API (bez audio)',
+  '`/youtube status|konto|playlisty` — dane YouTube OAuth (bez audio)',
   '`/zrodla szukaj query:...` — wyszukaj nagranie; `/zrodla graj numer:1` — wybierz wynik',
   '`/247 on mode:radio station:<nazwa>` — graj radio bez przerw',
   '`/247 on mode:autodj` — powtarzaj pliki music/ w pętli',
@@ -192,6 +196,38 @@ client.on(Events.InteractionCreate, async interaction => {
       return interaction.reply({ content: await executeControl(interaction, interaction.customId.slice(4)), ...ephemeral });
     }
     const name = interaction.commandName;
+    if (name === 'spotify') {
+      const sub = interaction.options.getSubcommand();
+      if (sub === 'status') {
+        const cfg = spotifyApi.config();
+        if (!cfg.ready) return interaction.reply({content:'🎵 Spotify Web API: ' + cfg.status + '. Ustaw SPOTIFY_CLIENT_ID i SPOTIFY_CLIENT_SECRET w .env na hostingu. API nie udostępnia muzyki.', ...ephemeral});
+        await interaction.deferReply(ephemeral);
+        try {
+          await spotifyApi.accessToken();
+          return interaction.editReply({content:'✅ Spotify Web API: token aplikacji działa. Można sprawdzać metadane utworów; API nie udostępnia audio Discordowi.'});
+        } catch(err){return interaction.editReply({content:'❌ ' + cleanTitle(err.message)});}
+      }
+      await interaction.deferReply(ephemeral);
+      const track = await spotifyApi.getTrack(interaction.options.getString('link',true));
+      return interaction.editReply({content:'🎵 Spotify: **'+cleanTitle(track.artist)+' — '+cleanTitle(track.title)+'**\nLink: '+track.url+'\nTylko metadane, bez audio.',allowedMentions:{parse:[]}});
+    }
+    if (name === 'youtube') {
+      const sub = interaction.options.getSubcommand();
+      if (sub === 'status') {
+        const cfg = youtubeOauth.config();
+        return interaction.reply({content:'📺 YouTube OAuth 2.0: ' + cfg.status + '.\nYouTube Data API umożliwia odczyt kanału i playlist, ale nie udostępnia audio i nie usuwa HTTP 403.', ...ephemeral});
+      }
+      adminOnly(interaction);
+      await interaction.deferReply(ephemeral);
+      if (sub === 'konto') {
+        const data = await youtubeOauth.account();
+        return interaction.editReply({content:'📺 **Połączony kanał YouTube:** '+cleanTitle(data.title)+(data.id?'\nID: '+data.id:''), allowedMentions:{parse:[]}});
+      }
+      const items = await youtubeOauth.playlists();
+      return interaction.editReply({content:('📚 **Playlisty YouTube** (tylko odczyt):\n'+
+        (items.length ? items.map((p,i)=>(i+1)+'. **'+cleanTitle(p.title)+'**'+(p.count==null?'':' ('+p.count+' pozycji)')).join('\n'):'Nie znaleziono playlist.')+
+        '\nOAuth nie udostępnia strumienia audio.').slice(0,1900),allowedMentions:{parse:[]}});
+    }
     if (name === 'zrodla') {
       const sub = interaction.options.getSubcommand();
       if (sub === 'status') {

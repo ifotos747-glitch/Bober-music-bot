@@ -15,3 +15,10 @@ Aktualizacja bota muzycznego dla Discorda, oparta na BOBER MUSIC BOT 2.7.
 Wdrożenie krok po kroku: **`GITHUB_INSTRUKCJA.md`**. Konfiguracja: **`.env.example`**. Testy: `npm install && npm run check`.
 
 Wersja kodu: 3.0.0. Testy lokalne nie zastępują testów połączenia z Discord Voice i strumieni na Twoim hostingu.
+
+## API Spotify i OAuth YouTube
+- `/spotify status`, `/spotify utwor`: metadane z oficjalnego Spotify Web API. Wymagane opcjonalne `SPOTIFY_CLIENT_ID` + `SPOTIFY_CLIENT_SECRET` w prywatnym `.env`.
+- `/youtube status`, `/youtube konto`, `/youtube playlisty`: prywatne dane YouTube przez OAuth z zakresem `youtube.readonly`.
+- Połączenie z Google wykonaj na swoim komputerze Windows: `node tools/youtube-oauth-desktop.js`. Szczegóły w `YOUTUBE_OAUTH_KROK_PO_KROKU.md`.
+- Żadne z tych API **nie udostępnia pełnego audio do odtwarzania na Discordzie** ani nie znosi blokady YouTube HTTP 403.
+- Nigdy nie zapisuj Client Secret, refresh tokenów ani `.env` w publicznym repozytorium.

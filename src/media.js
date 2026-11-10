@@ -135,6 +135,17 @@ async function extractMetadata(input) {
   }
 }
 async function spotifyTitle(link) {
+  // Jeśli skonfigurowano Spotify Web API, preferuj oficjalne metadane.
+  // Na HTTP 403 i ograniczeniach Dev Mode bezpiecznie wróć do oEmbed.
+  const spotifyApi = require('./spotify-api');
+  if (spotifyApi.config().ready) {
+    try {
+      const result = await spotifyApi.getTrack(link);
+      return {title:result.title, artist:result.artist};
+    } catch {
+      console.warn('[SPOTIFY] Web API niedostępne, ponawiam przez publiczny oEmbed.');
+    }
+  }
   const url = 'https://open.spotify.com/oembed?url=' + encodeURIComponent(link);
   const res = await fetch(url, { signal: AbortSignal.timeout(12000), headers: { accept: 'application/json' } });
   if (!res.ok) throw new Error(`Spotify nie zwróciło tytułu utworu (HTTP ${res.status}).`);

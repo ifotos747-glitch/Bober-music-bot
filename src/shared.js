@@ -81,6 +81,14 @@ const commands = [
     .addSubcommand(s => s.setName('status').setDescription('Sprawdź dostęp do API Audius i Jamendo z hostingu'))
     .addSubcommand(s => s.setName('graj').setDescription('Odtwórz wybrany numer z ostatniego wyszukiwania')
       .addIntegerOption(o => o.setName('numer').setDescription('Numer 1–8 z /zrodla szukaj').setRequired(true).setMinValue(1).setMaxValue(8))),
+  new SlashCommandBuilder().setName('spotify').setDescription('Spotify Web API — metadane utworów (bez audio)')
+    .addSubcommand(s => s.setName('status').setDescription('Sprawdź Spotify Client ID i Secret'))
+    .addSubcommand(s => s.setName('utwor').setDescription('Pokaż tytuł i wykonawcę nagrania Spotify')
+      .addStringOption(o => o.setName('link').setDescription('Link do utworu Spotify (track)').setRequired(true))),
+  new SlashCommandBuilder().setName('youtube').setDescription('YouTube OAuth — dane konta, tylko odczyt')
+    .addSubcommand(s => s.setName('status').setDescription('Sprawdź konfigurację OAuth 2.0'))
+    .addSubcommand(s => s.setName('konto').setDescription('Sprawdź połączony kanał YouTube (administrator)'))
+    .addSubcommand(s => s.setName('playlisty').setDescription('Lista playlist konta (administrator)')),
   new SlashCommandBuilder().setName('status').setDescription('Stan dźwięku, FFmpeg i YouTube')
 ];
 module.exports = { commands };
