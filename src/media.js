@@ -73,14 +73,28 @@ function isYoutubeChallenge(log) {
 }
 
 
-async function probeTool(command, args = ['-version'], timeout = 7000) {
+async const probeCache = new Map();
+const probePending = new Map();
+function probeTool(command, args = ['-version'], timeout = 20000) {
+  const key = JSON.stringify([command, args]);
+  const cached = probeCache.get(key);
+  if (cached && Date.now() - cached.time < 300000) return Promise.resolve(cached.result);
+  if (probePending.has(key)) return probePending.get(key);
+  const promise = probeToolOnce(command, args, timeout).then(result => {
+    if (result.ok) probeCache.set(key, { time: Date.now(), result });
+    return result;
+  }).finally(() => probePending.delete(key));
+  probePending.set(key, promise);
+  return promise;
+}
+function probeToolOnce(command, args, timeout) {
   return new Promise(resolve => {
     let output = '', stderr = '', done = false;
     let child;
     const finish = (result) => { if (!done) { done = true; clearTimeout(timer); resolve(result); } };
     try { child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }); }
     catch (e) { return resolve({ ok: false, message: e.message }); }
-    const timer = setTimeout(() => { child.kill(); finish({ ok: false, message: 'Przekroczony czas oczekiwania' }); }, timeout);
+    const timer = setTimeout(() => { child.kill(); finish({ ok: false, message: 'Przekroczony czas oczekiwania (' + timeout/1000 + ' s)' }); }, timeout);
     child.stdout.on('data', c => { output = (output + c.toString()).slice(0, 600); });
     child.stderr.on('data', c => { stderr = (stderr + c.toString()).slice(0, 500); });
     child.on('error', e => finish({ ok: false, message: e.code || e.message }));
