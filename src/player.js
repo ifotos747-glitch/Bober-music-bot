@@ -254,7 +254,7 @@ class MusicSession {
     const inputArgs = track.kind === 'file'
       ? ['-i', path.join(MUSIC_DIR, track.source)]
       : track.kind === 'radio'
-        ? ['-user_agent', 'Mozilla/5.0', '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_on_network_error', '1', '-reconnect_on_http_error', '429,5xx', '-reconnect_delay_max', '5', '-rw_timeout', '15000000', '-probesize', '1048576', '-analyzeduration', '5000000', '-i', track.source]
+        ? ['-user_agent', 'Mozilla/5.0', '-rw_timeout', '15000000', '-threads', '1', '-i', track.source]
         : track.kind === 'stream'
           ? ['-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '2', '-rw_timeout', '15000000', '-i', track.source]
           : ['-i', 'pipe:0'];
@@ -263,7 +263,9 @@ class MusicSession {
       '-vn', '-map', '0:a:0', '-ac', '2', '-ar', '48000',
       ...(filters.length ? ['-af', filters.join(',')] : []), '-f', 's16le', 'pipe:1'];
     if (track.kind === 'radio') console.log(`[RADIO FIX 4.2 ${this.guildId}] Start: ${cleanTitle(track.title)} | host: ${new URL(track.source).hostname}`);
-    const ff = spawn(getFFmpegPath(), args, {
+    const executable = track.kind === 'radio' ? (process.env.RADIO_FFMPEG_PATH?.trim() || getFFmpegPath()) : getFFmpegPath();
+    if (track.kind === 'radio') console.log(`[RADIO SAFE 4.2.1] FFmpeg: ${executable}`);
+    const ff = spawn(executable, args, {
       stdio: [track.kind === 'youtube' ? 'pipe' : 'ignore', 'pipe', 'pipe'], windowsHide: true,
     });
     this.ffmpegProcess = ff;
@@ -279,6 +281,7 @@ class MusicSession {
     ff.on('close', (code, signal) => {
       if (track.kind === 'radio') console.log(`[RADIO ${this.guildId}] FFmpeg exit=${code} signal=${signal || '-'} PCM=${audioBytes} B; ${scrubErrors(ffTail) || 'brak stderr'}`);
       if (this.closed || this.ffmpegProcess !== ff || ff.killed) return;
+      if (track.kind === 'radio' && signal === 'SIGSEGV') console.error('[RADIO SAFE 4.2.1] Awaria natywna FFmpeg. Ustaw RADIO_FFMPEG_PATH na alternatywny działający plik FFmpeg, jeśli dostępny.');
       if (track.kind === 'radio' && audioBytes === 0) return this.failTrack(`FFmpeg radio: brak audio (exit=${code}, signal=${signal || '-'}). ${scrubErrors(ffTail) || 'Brak komunikatu FFmpeg.'}`, track);
       if (code !== 0) this.failTrack(`FFmpeg: ${scrubErrors(ffTail) || 'zakończono z kodem ' + code}`, track);
     });
