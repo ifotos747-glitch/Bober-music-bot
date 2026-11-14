@@ -1,6 +1,7 @@
 'use strict';
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
+const { Readable } = require('node:stream');
 const path = require('node:path');
 const {
   joinVoiceChannel, createAudioPlayer, createAudioResource,
@@ -36,6 +37,8 @@ class MusicSession {
     this.effects = effectsStore.read(guild.id);
     this.resource = null;
     this.ffmpegProcess = null;
+    this.radioAbort = null;
+    this.radioInput = null;
     this.ytProcess = null;
     this.closed = false;
     this.starting = false;
@@ -127,6 +130,10 @@ class MusicSession {
   }
   cleanProcesses() {
     this.clearStartupTimer();
+    this.radioAbort?.abort();
+    this.radioAbort = null;
+    this.radioInput?.destroy();
+    this.radioInput = null;
     for (const prop of ['ytProcess', 'ffmpegProcess']) {
       const p = this[prop];
       this[prop] = null;
@@ -254,7 +261,7 @@ class MusicSession {
     const inputArgs = track.kind === 'file'
       ? ['-i', path.join(MUSIC_DIR, track.source)]
       : track.kind === 'radio'
-        ? ['-user_agent', 'Mozilla/5.0', '-rw_timeout', '15000000', '-threads', '1', '-i', track.source]
+        ? ['-protocol_whitelist', 'pipe', '-threads', '1', '-i', 'pipe:0']
         : track.kind === 'stream'
           ? ['-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '2', '-rw_timeout', '15000000', '-i', track.source]
           : ['-i', 'pipe:0'];
@@ -266,7 +273,7 @@ class MusicSession {
     const executable = track.kind === 'radio' ? (process.env.RADIO_FFMPEG_PATH?.trim() || getFFmpegPath()) : getFFmpegPath();
     if (track.kind === 'radio') console.log(`[RADIO SAFE 4.2.1] FFmpeg: ${executable}`);
     const ff = spawn(executable, args, {
-      stdio: [track.kind === 'youtube' ? 'pipe' : 'ignore', 'pipe', 'pipe'], windowsHide: true,
+      stdio: [track.kind === 'youtube' || track.kind === 'radio' ? 'pipe' : 'ignore', 'pipe', 'pipe'], windowsHide: true,
     });
     this.ffmpegProcess = ff;
     let ffTail = '';
@@ -281,10 +288,41 @@ class MusicSession {
     ff.on('close', (code, signal) => {
       if (track.kind === 'radio') console.log(`[RADIO ${this.guildId}] FFmpeg exit=${code} signal=${signal || '-'} PCM=${audioBytes} B; ${scrubErrors(ffTail) || 'brak stderr'}`);
       if (this.closed || this.ffmpegProcess !== ff || ff.killed) return;
-      if (track.kind === 'radio' && signal === 'SIGSEGV') console.error('[RADIO SAFE 4.2.1] Awaria natywna FFmpeg. Ustaw RADIO_FFMPEG_PATH na alternatywny działający plik FFmpeg, jeśli dostępny.');
+      if (track.kind === 'radio' && signal === 'SIGSEGV') console.error('[RADIO SAFE 4.2.1] Awaria natywna FFmpeg w dekoderze. Ustaw RADIO_FFMPEG_PATH na alternatywny działający plik FFmpeg, jeśli dostępny.');
       if (track.kind === 'radio' && audioBytes === 0) return this.failTrack(`FFmpeg radio: brak audio (exit=${code}, signal=${signal || '-'}). ${scrubErrors(ffTail) || 'Brak komunikatu FFmpeg.'}`, track);
       if (code !== 0) this.failTrack(`FFmpeg: ${scrubErrors(ffTail) || 'zakończono z kodem ' + code}`, track);
     });
+
+    if (track.kind === 'radio') {
+      const controller = new AbortController();
+      this.radioAbort = controller;
+      let inputBytes = 0;
+      const active = () => !this.closed && this.current === track && this.ffmpegProcess === ff && !controller.signal.aborted;
+      ff.stdin.on('error', e => {
+        if (active() && e.code !== 'EPIPE') this.failTrack('Radio pipe: ' + e.message, track);
+      });
+      console.log('[RADIO PIPE 4.2.2] Node HTTP -> FFmpeg stdin');
+      fetch(track.source, {
+        signal: controller.signal, redirect: 'follow',
+        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': '*/*', 'Icy-MetaData': '0', 'Accept-Encoding': 'identity' },
+      }).then(response => {
+        if (!active()) { void response.body?.cancel().catch(() => {}); return; }
+        const type = response.headers.get('content-type') || '';
+        console.log(`[RADIO HTTP ${this.guildId}] HTTP ${response.status}; typ=${type}; host=${new URL(response.url).hostname}`);
+        if (!response.ok || !response.body || /text\/html|mpegurl|scpls|dash\+xml/i.test(type)) {
+          void response.body?.cancel().catch(() => {});
+          throw new Error('HTTP ' + response.status + '; typ=' + type + ' (wymagany bezpośredni strumień audio, nie strona ani playlista).');
+        }
+        const input = Readable.fromWeb(response.body);
+        this.radioInput = input;
+        input.on('error', e => { if (active()) this.failTrack('Radio HTTP: ' + e.message, track); });
+        input.on('data', chunk => {
+          if (!inputBytes) console.log(`[RADIO HTTP ${this.guildId}] Pierwsze dane wejściowe: ${chunk.length} B`);
+          inputBytes += chunk.length;
+        });
+        input.pipe(ff.stdin);
+      }).catch(e => { if (active()) this.failTrack('Radio HTTP: ' + scrubErrors(e.message), track); });
+    }
 
     if (track.kind === 'youtube') {
       const yt = spawn(getYtdlpPath(), [
