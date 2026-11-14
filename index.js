@@ -1,6 +1,6 @@
 // BOBER MUSIC BOT 4.0 — integralność wdrożenia i bezpieczny start
 'use strict';
-require('dotenv').config();
+require('dotenv').config({ path: require('node:path').join(__dirname, '.env') });
 const fs = require('node:fs');
 const path = require('node:path');
 const packageInfo = require('./package.json');
@@ -27,14 +27,24 @@ for (const [filename, marker] of required) {
     process.exit(1);
   }
 }
+console.log('🔧 WISPBYTE START FIX 1');
 async function main() {
   const { register } = require('./src/register');
   await register();
   require('./src/index');
   if (process.env.YTDLP_AUTO_INSTALL !== '0') {
-    require('./tools/install-ytdlp').ensureYtdlp()
-      .then(found => console.log('✅ yt-dlp gotowe:', found))
-      .catch(error => console.warn('⚠️ yt-dlp niedostępne:', error.message));
+    const candidates = ['tools/install-ytdlp.js', '.tools/install-ytdlp.js'];
+    const installer = candidates.find(file => fs.existsSync(path.join(__dirname, file)));
+    if (!installer) {
+      console.warn('⚠️ Brak instalatora yt-dlp. Wgraj tools/install-ytdlp.js do /home/container/tools/. Radio i inne źródła pozostają dostępne, jeśli ich narzędzia działają.');
+      return;
+    }
+    try {
+      const found = await require(path.join(__dirname, installer)).ensureYtdlp();
+      console.log('✅ yt-dlp gotowe:', found);
+    } catch (error) {
+      console.warn('⚠️ yt-dlp niedostępne:', error.message);
+    }
   }
 }
-main().catch(error => { console.error('❌ Błąd startu 4.0:', error.message); process.exitCode = 1; });
+main().catch(error => { console.error('❌ Błąd startu ' + packageInfo.version + ':', error.message); process.exitCode = 1; });
