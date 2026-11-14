@@ -1,7 +1,11 @@
 'use strict';
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
-const { Readable } = require('node:stream');
+const { Readable, PassThrough } = require('node:stream');
+const { monitorEventLoopDelay } = require('node:perf_hooks');
+const eventDelay = monitorEventLoopDelay({ resolution: 20 });
+eventDelay.enable();
+const audioBufferMs = (key, fallback) => Math.max(500, Math.min(10000, Number(process.env[key]) || fallback));
 const path = require('node:path');
 const {
   joinVoiceChannel, createAudioPlayer, createAudioResource,
@@ -39,6 +43,8 @@ class MusicSession {
     this.ffmpegProcess = null;
     this.radioAbort = null;
     this.radioInput = null;
+    this.audioBuffer = null;
+    this.audioMonitor = null;
     this.ytProcess = null;
     this.closed = false;
     this.starting = false;
@@ -130,6 +136,10 @@ class MusicSession {
   }
   cleanProcesses() {
     this.clearStartupTimer();
+    if (this.audioMonitor) clearInterval(this.audioMonitor);
+    this.audioMonitor = null;
+    this.audioBuffer?.destroy();
+    this.audioBuffer = null;
     this.radioAbort?.abort();
     this.radioAbort = null;
     this.radioInput?.destroy();
@@ -346,11 +356,48 @@ class MusicSession {
       yt.stdout.pipe(ff.stdin);
       ff.stdin.on('error', () => {}); // EPIPE po pominięciu utworu jest normalny.
     }
-    this.resource = createAudioResource(ff.stdout, {
-      inputType: StreamType.Raw, inlineVolume: true, metadata: track,
-    });
-    this.resource.volume.setVolume(this.volume / 100);
-    this.player.play(this.resource);
+    const buffered = track.kind === 'radio' || track.kind === 'youtube';
+    const targetMs = track.kind === 'radio' ? audioBufferMs('RADIO_BUFFER_MS', 2500) : audioBufferMs('YOUTUBE_BUFFER_MS', 5000);
+    const targetBytes = Math.ceil(targetMs * 192);
+    const buffer = buffered ? new PassThrough({ highWaterMark: targetBytes + 65536 }) : null;
+    if (buffer) {
+      this.audioBuffer = buffer;
+      buffer.on('error', e => { if (this.current === track && this.audioBuffer === buffer) this.failTrack('Audio buffer: ' + e.message, track); });
+      ff.stdout.pipe(buffer);
+    }
+    const start = () => {
+      if (this.closed || this.current !== track || this.ffmpegProcess !== ff) return;
+      this.resource = createAudioResource(buffer || ff.stdout, {
+        inputType: StreamType.Raw, inlineVolume: true, metadata: track,
+      });
+      this.resource.volume.setVolume(this.volume / 100);
+      this.player.play(this.resource);
+      if (buffer) {
+        let low = 0;
+        this.audioMonitor = setInterval(() => {
+          if (this.current !== track || this.audioBuffer !== buffer) return;
+          const ms = Math.round(buffer.readableLength / 192);
+          if (ms < 100 && !buffer.writableEnded) low++;
+          console.log(`[AUDIO STABILITY 4.3 ${this.guildId}] ${track.kind} | buffer=${ms}ms | low=${low} | ping=${this.connection.ping?.ws ?? '-'}ms | loopP99=${(eventDelay.percentile(99)/1e6).toFixed(1)}ms | RSS=${Math.round(process.memoryUsage().rss/1048576)}MB`);
+        }, 10000);
+        this.audioMonitor.unref?.();
+      }
+    };
+    if (buffer) {
+      let started = false;
+      const maybeStart = () => {
+        if (started || this.closed || this.current !== track || this.ffmpegProcess !== ff) return;
+        if (buffer.readableLength < targetBytes && !buffer.writableEnded && !ff.stdout.readableEnded) return;
+        if (!buffer.readableLength) return;
+        started = true;
+        buffer.removeListener('readable', maybeStart);
+        buffer.removeListener('finish', maybeStart);
+        console.log(`[AUDIO STABILITY 4.3] Start ${track.kind}; prebuffer=${Math.round(buffer.readableLength/192)}ms`);
+        start();
+      };
+      buffer.on('readable', maybeStart);
+      buffer.on('finish', maybeStart);
+    } else start();
     this.startupTimer = setTimeout(() => {
       if (this.current === track && this.player.state.status !== AudioPlayerStatus.Playing)
         this.failTrack(track.kind === 'radio' ? `Radio: brak dźwięku przez 45 s. ${scrubErrors(ffTail) || 'Brak komunikatu FFmpeg.'}` : 'Nie pojawił się dźwięk w ciągu 45 sekund. Sprawdź FFmpeg, yt-dlp i dostęp YouTube.', track);
