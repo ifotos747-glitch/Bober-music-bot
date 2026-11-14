@@ -73,7 +73,7 @@ function isYoutubeChallenge(log) {
 }
 
 
-async const probeCache = new Map();
+const probeCache = new Map();
 const probePending = new Map();
 function probeTool(command, args = ['-version'], timeout = 20000) {
   const key = JSON.stringify([command, args]);
