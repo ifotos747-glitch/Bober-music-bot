@@ -254,29 +254,32 @@ class MusicSession {
     const inputArgs = track.kind === 'file'
       ? ['-i', path.join(MUSIC_DIR, track.source)]
       : track.kind === 'radio'
-        ? ['-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_at_eof', '1', '-reconnect_delay_max', '5', '-rw_timeout', '15000000', '-i', track.source]
+        ? ['-user_agent', 'Mozilla/5.0', '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_on_network_error', '1', '-reconnect_on_http_error', '429,5xx', '-reconnect_delay_max', '5', '-rw_timeout', '15000000', '-probesize', '1048576', '-analyzeduration', '5000000', '-i', track.source]
         : track.kind === 'stream'
           ? ['-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '2', '-rw_timeout', '15000000', '-i', track.source]
           : ['-i', 'pipe:0'];
     const filters = effectsStore.makeFilters(this.effects);
-    const args = ['-nostdin', '-hide_banner', '-loglevel', 'error', ...inputArgs,
+    const args = ['-nostdin', '-hide_banner', '-loglevel', track.kind === 'radio' ? 'warning' : 'error', ...inputArgs,
       '-vn', '-map', '0:a:0', '-ac', '2', '-ar', '48000',
       ...(filters.length ? ['-af', filters.join(',')] : []), '-f', 's16le', 'pipe:1'];
+    if (track.kind === 'radio') console.log(`[RADIO FIX 4.2 ${this.guildId}] Start: ${cleanTitle(track.title)} | host: ${new URL(track.source).hostname}`);
     const ff = spawn(getFFmpegPath(), args, {
       stdio: [track.kind === 'youtube' ? 'pipe' : 'ignore', 'pipe', 'pipe'], windowsHide: true,
     });
     this.ffmpegProcess = ff;
     let ffTail = '';
-    ff.stderr.on('data', d => { ffTail = (ffTail + d.toString()).slice(-1200); });
+    ff.stderr.on('data', d => { ffTail = (ffTail + d.toString()).slice(-2000); if (track.kind === 'radio') console.warn(`[RADIO FFMPEG ${this.guildId}] ${scrubErrors(d.toString())}`); });
     let audioBytes = 0;
-    ff.stdout.on('data', c => { audioBytes += c.length; });
+    ff.stdout.on('data', c => { if (!audioBytes && track.kind === 'radio') console.log(`[RADIO ${this.guildId}] Pierwsze dane PCM: ${c.length} B`); audioBytes += c.length; });
     ff.stdout.on('end', () => {
       if (this.closed || this.ffmpegProcess !== ff || ff.killed) return;
-      if (audioBytes === 0) this.failTrack(`FFmpeg nie przesłał żadnych danych audio. ${scrubErrors(ffTail)}`, track);
+      if (audioBytes === 0 && track.kind !== 'radio') this.failTrack(`FFmpeg nie przesłał żadnych danych audio. ${scrubErrors(ffTail)}`, track);
     });
     ff.on('error', e => this.failTrack(`Nie można uruchomić FFmpeg (${e.code || e.message}). Sprawdź /status.`, track));
-    ff.on('close', code => {
+    ff.on('close', (code, signal) => {
+      if (track.kind === 'radio') console.log(`[RADIO ${this.guildId}] FFmpeg exit=${code} signal=${signal || '-'} PCM=${audioBytes} B; ${scrubErrors(ffTail) || 'brak stderr'}`);
       if (this.closed || this.ffmpegProcess !== ff || ff.killed) return;
+      if (track.kind === 'radio' && audioBytes === 0) return this.failTrack(`FFmpeg radio: brak audio (exit=${code}, signal=${signal || '-'}). ${scrubErrors(ffTail) || 'Brak komunikatu FFmpeg.'}`, track);
       if (code !== 0) this.failTrack(`FFmpeg: ${scrubErrors(ffTail) || 'zakończono z kodem ' + code}`, track);
     });
 
@@ -309,7 +312,7 @@ class MusicSession {
     this.player.play(this.resource);
     this.startupTimer = setTimeout(() => {
       if (this.current === track && this.player.state.status !== AudioPlayerStatus.Playing)
-        this.failTrack('Nie pojawił się dźwięk w ciągu 45 sekund. Sprawdź FFmpeg, yt-dlp i dostęp YouTube.', track);
+        this.failTrack(track.kind === 'radio' ? `Radio: brak dźwięku przez 45 s. ${scrubErrors(ffTail) || 'Brak komunikatu FFmpeg.'}` : 'Nie pojawił się dźwięk w ciągu 45 sekund. Sprawdź FFmpeg, yt-dlp i dostęp YouTube.', track);
     }, 45_000);
     this.startupTimer.unref?.();
   }
