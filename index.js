@@ -28,6 +28,21 @@ for (const [filename, marker] of required) {
   }
 }
 console.log('🔧 WISPBYTE START FIX 1');
+console.log('🔧 WISPBYTE SYNTAX CHECK 4.3.3');
+const { spawnSync } = require('node:child_process');
+const checkFiles = [
+  ...fs.readdirSync(path.join(__dirname, 'src')).filter(name => name.endsWith('.js')).map(name => path.join('src', name)),
+  ...['tools', '.tools'].flatMap(dir => fs.existsSync(path.join(__dirname, dir)) ? fs.readdirSync(path.join(__dirname, dir)).filter(name => name.endsWith('.js')).map(name => path.join(dir, name)) : []),
+];
+for (const filename of checkFiles) {
+  const result = spawnSync(process.execPath, ['--check', path.join(__dirname, filename)], { encoding: 'utf8', timeout: 20000 });
+  if (result.status !== 0) {
+    console.error('❌ SYNTAX ERROR: ' + filename);
+    console.error(result.stderr || result.error?.message || 'Kontrola nie powiodła się.');
+    process.exit(1);
+  }
+}
+console.log('✅ Składnia OK: ' + checkFiles.length + ' plików JS.');
 async function main() {
   const { register } = require('./src/register');
   await register();
@@ -47,4 +62,4 @@ async function main() {
     }
   }
 }
-main().catch(error => { console.error('❌ Błąd startu ' + packageInfo.version + ':', error.message); process.exitCode = 1; });
+main().catch(error => { console.error('❌ Błąd startu ' + packageInfo.version + ':', error.stack || error.message); process.exitCode = 1; });
