@@ -110,6 +110,12 @@ const commands = [
       .addIntegerOption(o => o.setName('numer').setDescription('Numer z /ulubione lista').setMinValue(1).setMaxValue(30).setRequired(true)))
     .addSubcommand(s => s.setName('usun').setDescription('Usuń utwór ze swoich ulubionych')
       .addIntegerOption(o => o.setName('numer').setDescription('Numer z /ulubione lista').setMinValue(1).setMaxValue(30).setRequired(true))),
+  new SlashCommandBuilder().setName('music').setDescription('Nowoczesny panel muzyczny BOBER 5.0'),
+  new SlashCommandBuilder().setName('stats').setDescription('Statystyki aktywnych sesji i wydajności bota'),
+  new SlashCommandBuilder().setName('loop').setDescription('Ustaw powtarzanie').addStringOption(o => o.setName('mode').setDescription('Tryb').setRequired(true).addChoices({name:'Off',value:'off'},{name:'Track',value:'one'},{name:'Queue',value:'all'})),
+  new SlashCommandBuilder().setName('shuffle').setDescription('Przetasuj kolejkę'),
+  new SlashCommandBuilder().setName('clear').setDescription('Wyczyść oczekującą kolejkę'),
+  new SlashCommandBuilder().setName('premium').setDescription('Informacja o lokalnym planie Premium serwera'),
   new SlashCommandBuilder().setName('status').setDescription('Stan dźwięku, FFmpeg i YouTube')
 ];
 module.exports = { commands };
