@@ -1,8 +1,8 @@
 {
   "name": "bober-music-bot",
-  "version": "4.1.0",
+  "version": "5.0.0",
   "private": true,
-  "description": "BOBER MUSIC BOT 4.1 — Botkeep Edition, retaining 4.0.1 music features",
+  "description": "BOBER MUSIC BOT 5.0 — Music Experience",
   "engines": {
     "node": ">=24.17.0"
   },
