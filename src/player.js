@@ -1,7 +1,7 @@
 'use strict';
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
-const { Readable, PassThrough } = require('node:stream');
+const { Readable, PassThrough, Transform } = require('node:stream');
 const { monitorEventLoopDelay } = require('node:perf_hooks');
 const eventDelay = monitorEventLoopDelay({ resolution: 20 });
 eventDelay.enable();
@@ -44,6 +44,7 @@ class MusicSession {
     this.radioAbort = null;
     this.radioInput = null;
     this.audioBuffer = null;
+    this.audioMeter = null;
     this.audioMonitor = null;
     this.ytProcess = null;
     this.closed = false;
@@ -139,6 +140,8 @@ class MusicSession {
     if (this.audioMonitor) clearInterval(this.audioMonitor);
     this.audioMonitor = null;
     this.audioBuffer?.destroy();
+    this.audioMeter?.destroy();
+    this.audioMeter = null;
     this.audioBuffer = null;
     this.radioAbort?.abort();
     this.radioAbort = null;
@@ -289,7 +292,10 @@ class MusicSession {
     let ffTail = '';
     ff.stderr.on('data', d => { ffTail = (ffTail + d.toString()).slice(-2000); if (track.kind === 'radio') console.warn(`[RADIO FFMPEG ${this.guildId}] ${scrubErrors(d.toString())}`); });
     let audioBytes = 0;
-    ff.stdout.on('data', c => { if (!audioBytes && track.kind === 'radio') console.log(`[RADIO ${this.guildId}] Pierwsze dane PCM: ${c.length} B`); audioBytes += c.length; });
+    const guild = this.guildId;
+    const meter = new Transform({ transform(c, enc, cb) { if (!audioBytes && track.kind === 'radio') console.log(`[RADIO ${guild}] Pierwsze dane PCM: ${c.length} B`); audioBytes += c.length; cb(null,c); } });
+    this.audioMeter = meter;
+    ff.stdout.pipe(meter);
     ff.stdout.on('end', () => {
       if (this.closed || this.ffmpegProcess !== ff || ff.killed) return;
       if (audioBytes === 0 && track.kind !== 'radio') this.failTrack(`FFmpeg nie przesłał żadnych danych audio. ${scrubErrors(ffTail)}`, track);
@@ -357,17 +363,17 @@ class MusicSession {
       ff.stdin.on('error', () => {}); // EPIPE po pominięciu utworu jest normalny.
     }
     const buffered = track.kind === 'radio' || track.kind === 'youtube';
-    const targetMs = track.kind === 'radio' ? audioBufferMs('RADIO_BUFFER_MS', 2500) : audioBufferMs('YOUTUBE_BUFFER_MS', 5000);
+    const targetMs = track.kind === 'radio' ? audioBufferMs('RADIO_BUFFER_MS', 3000) : audioBufferMs('YOUTUBE_BUFFER_MS', 8000);
     const targetBytes = Math.ceil(targetMs * 192);
     const buffer = buffered ? new PassThrough({ highWaterMark: targetBytes + 65536 }) : null;
     if (buffer) {
       this.audioBuffer = buffer;
       buffer.on('error', e => { if (this.current === track && this.audioBuffer === buffer) this.failTrack('Audio buffer: ' + e.message, track); });
-      ff.stdout.pipe(buffer);
+      meter.pipe(buffer);
     }
     const start = () => {
       if (this.closed || this.current !== track || this.ffmpegProcess !== ff) return;
-      this.resource = createAudioResource(buffer || ff.stdout, {
+      this.resource = createAudioResource(buffer || meter, {
         inputType: StreamType.Raw, inlineVolume: true, metadata: track,
       });
       this.resource.volume.setVolume(this.volume / 100);
@@ -387,7 +393,7 @@ class MusicSession {
       let started = false;
       const maybeStart = () => {
         if (started || this.closed || this.current !== track || this.ffmpegProcess !== ff) return;
-        if (buffer.readableLength < targetBytes && !buffer.writableEnded && !ff.stdout.readableEnded) return;
+        if (buffer.readableLength < targetBytes && !buffer.writableEnded && !meter.readableEnded) return;
         if (!buffer.readableLength) return;
         started = true;
         buffer.removeListener('readable', maybeStart);
