@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const { spawn } = require('node:child_process');
 const {
   Client, GatewayIntentBits, Events, MessageFlags,
-  ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, PermissionFlagsBits,
+  ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, PermissionFlagsBits, EmbedBuilder,
 } = require('discord.js');
 const { sessions, lastGuildErrors, getOrCreateSession, cleanTitle, MAX_QUEUE } = require('./player');
 const { resolveTrack, restoreSaved, listFiles, getYtdlpPath, getFFmpegPath, ensureAudioTools, probeTool } = require('./media');
@@ -57,6 +57,18 @@ const help = [
   'Spotify: przypisane audio → lokalny MP3 → jednoznaczne źródło Audius/Jamendo. Jeśli nie ma zgodnego nagrania, wybierz /zrodla szukaj.',
   'YouTube może blokować pobieranie na hostingu (HTTP 403); nie używaj cookies konta.'
 ].join('\n');
+function musicEmbed(session) {
+  const title = cleanTitle(session?.current?.title || 'Brak utworu');
+  const lines = (session?.queue || []).slice(0, 5).map((t,i) => (i+1)+'. '+cleanTitle(t.title));
+  return new EmbedBuilder().setColor(0x7950f2).setTitle('BOBER MUSIC • 5.0')
+    .setDescription('**Teraz gra**\n' + title)
+    .addFields(
+      {name:'Odtwarzacz',value:String(session?.player.state.status || 'idle'),inline:true},
+      {name:'Głośność',value:String(session?.volume ?? 100)+'%',inline:true},
+      {name:'Loop',value:String(session?.repeatMode || 'off'),inline:true},
+      {name:'Kolejka ('+(session?.queue.length || 0)+')',value:lines.join('\n').slice(0,1000)||'Pusta'}
+    ).setFooter({text:'BOBER • Music Experience'});
+}
 function controls() {
   return [new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('bm2:pause').setLabel('Pauza').setEmoji('⏸️').setStyle(ButtonStyle.Secondary),
@@ -65,7 +77,10 @@ function controls() {
     new ButtonBuilder().setCustomId('bm2:stop').setLabel('Stop').setEmoji('⏹️').setStyle(ButtonStyle.Danger)
   ), new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('bm2:shuffle').setLabel('Tasuj kolejkę').setEmoji('🔀').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('bm2:repeat').setLabel('Zmień powtarzanie').setEmoji('🔁').setStyle(ButtonStyle.Primary)
+    new ButtonBuilder().setCustomId('bm2:repeat').setLabel('Zmień powtarzanie').setEmoji('🔁').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('bm2:refresh').setLabel('Odśwież').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('bm2:volup').setLabel('+10%').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('bm2:voldown').setLabel('-10%').setStyle(ButtonStyle.Secondary)
   )];
 }
 function radioPanel(guildId) {
@@ -123,6 +138,11 @@ async function executeControl(interaction, action) {
   const session = sessions.get(interaction.guild.id);
   if (!session) throw new Error('Nic nie gra. Użyj `/play`.');
   if (!sameVoice(interaction, session)) throw new Error('Musisz być na kanale głosowym, na którym gra bot.');
+  if (action === 'volup' || action === 'voldown') {
+    session.volume = Math.max(0, Math.min(200, session.volume + (action === 'volup' ? 10 : -10)));
+    session.resource?.volume?.setVolume(session.volume / 100);
+    return 'Głośność: ' + session.volume + '%';
+  }
   if (action === 'pause') return session.player.pause() ? '⏸️ Pauza.' : 'Nie można wstrzymać.';
   if (action === 'resume') return session.player.unpause() ? '▶️ Wznowiono.' : 'Nie można wznowić.';
   if (action === 'skip') return session.skip() ? '⏭️ Pominięto.' : 'Nie ma utworu do pominięcia.';
@@ -178,7 +198,7 @@ function check247() {
   for (const saved of always247.list()) void ensure247Running(saved);
 }
 client.once(Events.ClientReady, c => {
-  console.log(`✅ BOBER MUSIC BOT 4.0 MEGA MUSIC UPDATE online: ${c.user.tag}`);
+  console.log(`✅ BOBER MUSIC BOT 5.0 MUSIC EXPERIENCE online: ${c.user.tag}`);
   setTimeout(check247, 1500).unref?.();
   setInterval(check247, 60_000).unref?.();
 });
@@ -208,6 +228,7 @@ client.on(Events.InteractionCreate, async interaction => {
     }
     if (interaction.isButton()) {
       if (!interaction.customId.startsWith('bm2:')) return;
+      if (interaction.customId === 'bm2:refresh') return interaction.update({content:null,embeds:[musicEmbed(sessions.get(interaction.guild.id))],components:controls(),allowedMentions:{parse:[]}});
       return interaction.reply({ content: await executeControl(interaction, interaction.customId.slice(4)), ...ephemeral });
     }
     const name = interaction.commandName;
@@ -418,7 +439,7 @@ client.on(Events.InteractionCreate, async interaction => {
       const [yt, ff] = await Promise.all([probeTool(getYtdlpPath(), ['--version']), probeTool(getFFmpegPath(), ['-version'])]);
       const s = sessions.get(interaction.guild.id);
       const lines = [
-        '🛠️ **BOBER MUSIC BOT 4.0.1 — Diagnostyka audio i 24/7**',
+        '🛠️ **BOBER MUSIC BOT 5.0 — Diagnostyka audio i 24/7**',
         `Wersja uruchomiona: **${require('../package.json').version}**`,
         `Przypisane źródła alternatywne: **${alternatives.list(interaction.guild.id).length}**`,
         `Katalogi: Audius ${process.env.AUDIUS_ENABLED==='0'?'wyłączony':'włączony'}; Jamendo ${process.env.JAMENDO_CLIENT_ID?'skonfigurowany':'wymaga Client ID'}`,
@@ -460,6 +481,26 @@ client.on(Events.InteractionCreate, async interaction => {
       const session = getOrCreateSession(interaction.guild, vc, interaction.channel);
       session.enqueue(track);
       return interaction.editReply({ content: `✅ Dodano do kolejki: **${cleanTitle(track.title)}**\nŹródło: ${track.kind === 'youtube' ? 'YouTube' : track.kind === 'radio' ? 'Radio / audio URL' : track.kind === 'stream' ? track.provider + ' (strumień)' : 'Plik lokalny'}${track.attribution ? '\nAutor: ' + cleanTitle(track.attribution) + '\nWięcej: ' + track.page : ''}`, allowedMentions: { parse: [] } });
+    }
+    if (name === 'stats') {
+      const active = [...sessions.values()];
+      return interaction.reply({content: '📊 **BOBER 5.0**\nSerwery: '+client.guilds.cache.size+'\nSesje: '+active.length+'\nGrające: '+active.filter(s=>s.player.state.status==='playing').length+'\nRSS Node: '+Math.round(process.memoryUsage().rss/1048576)+' MB\nUptime: '+Math.floor(process.uptime()/60)+' min',...ephemeral});
+    }
+    if (name === 'premium') {
+      const ids = new Set((process.env.PREMIUM_GUILD_IDS || '').split(',').map(s=>s.trim()).filter(Boolean));
+      return interaction.reply({content:ids.has(interaction.guild.id)?'👑 Premium: aktywny plan lokalny (bez płatności).':'Plan Free. Premium: konfiguracja przez operatora bota.',...ephemeral});
+    }
+    if (['loop','shuffle','clear'].includes(name)) {
+      const session = sessions.get(interaction.guild.id);
+      if (!session || !sameVoice(interaction, session)) throw new Error('Dołącz do kanału bota.');
+      let message;
+      if (name === 'loop') { session.repeatMode = interaction.options.getString('mode',true); message='Loop: '+session.repeatMode; }
+      if (name === 'shuffle') message=await executeControl(interaction,'shuffle');
+      if (name === 'clear') { const count=session.queue.length; session.queue.length=0; message='Usunięto '+count+' utworów.'; }
+      return interaction.reply({content:message,...ephemeral});
+    }
+    if (name === 'music' || name === 'panel') {
+      return interaction.reply({embeds:[musicEmbed(sessions.get(interaction.guild.id))],components:controls(),allowedMentions:{parse:[]}});
     }
     if (name === 'panel') {
       const session = sessions.get(interaction.guild.id);
