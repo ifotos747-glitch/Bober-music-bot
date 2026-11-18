@@ -28,7 +28,7 @@ if (!token || token.startsWith('NOWY_TOKEN') || token.startsWith('WPISZ_')) {
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
 const ephemeral = { flags: MessageFlags.Ephemeral };
 const help = [
-  '**🎵 BOBER RADIO 24/7 — 5.1**',
+  '**🎵 BOBER RADIO 24/7 — 6.0**',
   '`/play source:<link YouTube / tytuł / radio / demo.wav>`',
   '`/search query:<tytuł>` — znajdź utwór na YouTube',
   '`/panel` — przyciski ⏸️ ▶️ ⏭️ ⏹️',
@@ -60,8 +60,8 @@ const help = [
 function musicEmbed(session) {
   const title = cleanTitle(session?.current?.title || 'Brak utworu');
   const lines = (session?.queue || []).slice(0, 5).map((t,i) => (i+1)+'. '+cleanTitle(t.title));
-  return new EmbedBuilder().setColor(0x7950f2).setTitle('BOBER RADIO 24/7 • 5.1')
-    .setDescription('**Teraz gra**\n' + title)
+  return new EmbedBuilder().setColor(0x7950f2).setTitle('BOBER RADIO 24/7 • 6.0')
+    .setDescription('**Teraz gra**\n' + title + (session?.radioTitle && session.current?.kind==='radio' ? '\n🎵 '+cleanTitle(session.radioTitle) : ''))
     .addFields(
       {name:'Odtwarzacz',value:String(session?.player.state.status || 'idle'),inline:true},
       {name:'Głośność',value:String(session?.volume ?? 100)+'%',inline:true},
@@ -141,6 +141,7 @@ async function executeControl(interaction, action) {
   if (action === 'volup' || action === 'voldown') {
     session.volume = Math.max(0, Math.min(200, session.volume + (action === 'volup' ? 10 : -10)));
     session.resource?.volume?.setVolume(session.volume / 100);
+    if(session.audioEngine==='Native Opus' && session.current) session.replaceWith({...session.current});
     return 'Głośność: ' + session.volume + '%';
   }
   if (action === 'pause') return session.player.pause() ? '⏸️ Pauza.' : 'Nie można wstrzymać.';
@@ -198,16 +199,15 @@ function check247() {
   for (const saved of always247.list()) void ensure247Running(saved);
 }
 client.once(Events.ClientReady, c => {
-  console.log(`✅ BOBER RADIO 24/7 5.1 online: ${c.user.tag}`);
+  console.log(`✅ BOBER RADIO 24/7 6.0 online: ${c.user.tag}`);
   setTimeout(check247, 1500).unref?.();
   setInterval(check247, 60_000).unref?.();
 });
 client.on(Events.InteractionCreate, async interaction => {
   if (interaction.isAutocomplete()) {
-    if (!['radio', '247'].includes(interaction.commandName) || !interaction.guildId) return;
+    if (!['radio', '247','radioplay','radiostation'].includes(interaction.commandName) || !interaction.guildId) return;
     const value = String(interaction.options.getFocused() || '').toLocaleLowerCase('pl');
-    const matching = radios.list(interaction.guildId)
-      .filter(station => station.name.toLocaleLowerCase('pl').includes(value))
+    const matching = radios.search(interaction.guildId,value)
       .slice(0, 25).map(station => ({ name: station.name.slice(0, 100), value: station.id }));
     return interaction.respond(matching).catch(() => {});
   }
@@ -232,6 +232,38 @@ client.on(Events.InteractionCreate, async interaction => {
       return interaction.reply({ content: await executeControl(interaction, interaction.customId.slice(4)), ...ephemeral });
     }
     const name = interaction.commandName;
+    const gid = interaction.guild.id;
+    const live = sessions.get(gid);
+    const opt = key => interaction.options.getString(key) || '';
+    const safeReply = content => interaction.reply({content,...ephemeral,allowedMentions:{parse:[]}});
+    const catalogOwner = () => {
+      const owners = (process.env.BOBER_OWNER_IDS || '').split(',').map(v=>v.trim()).filter(Boolean);
+      if (!owners.includes(interaction.user.id)) throw new Error('Tylko operator bota (BOBER_OWNER_IDS) może zmieniać katalog globalny.');
+    };
+    const currentRadio = () => {
+      if (!live || live.current?.kind !== 'radio') throw new Error('Radio nie gra.');
+      return live;
+    };
+    const catalogPage = (scope='all', query='', genre='', country='') => {
+      const all = radios.search(gid,query,genre,country,scope);
+      const pages=Math.max(1,Math.ceil(all.length/10));
+      const page=Math.min(pages,interaction.options.getInteger('page')||1);
+      return '📻 **Katalog • '+all.length+' stacji • '+page+'/'+pages+'**\n'+(all.slice((page-1)*10,page*10).map(s=>'**'+cleanTitle(s.name)+'** | '+cleanTitle(s.genre)+' | '+(s.global?'Globalna':'Lokalna')+' | '+s.id).join('\n')||'Brak wyników.');
+    };
+    if(name==='radiosearch') return safeReply(catalogPage(opt('scope')||'all',opt('query'),opt('genre'),opt('country')));
+    if(name==='radioglobal'||name==='radiolocal') return safeReply(catalogPage(name==='radioglobal'?'global':'local'));
+    if(name==='radioaddglobal'){catalogOwner();const st=radios.globalAdd(opt('name'),opt('url'),opt('genre'),opt('country'));return safeReply('✅ Globalna stacja: '+cleanTitle(st.name));}
+    if(name==='radioremoveglobal'){catalogOwner();const st=radios.globalRemove(opt('station'));return safeReply('Usunięto globalnie: '+cleanTitle(st.name));}
+    if(name==='radiopublish'){catalogOwner();const st=radios.search(gid,'','','','local').find(s=>s.id===opt('station')||s.name.toLowerCase()===opt('station').toLowerCase());if(!st)throw new Error('Nie znaleziono lokalnej stacji.');const g=radios.globalAdd(st.name,st.url,st.genre);return safeReply('Opublikowano: '+cleanTitle(g.name));}
+    if(name==='radioplay'){await interaction.deferReply(ephemeral);return interaction.editReply({content:await playStation(interaction,radios.find(gid,opt('station'))),allowedMentions:{parse:[]}});}
+    if(name==='radiostation'){const st=radios.find(gid,opt('station'));if(!st)throw new Error('Nie znaleziono stacji.');return safeReply(cleanTitle(st.name)+' | '+cleanTitle(st.genre)+' | '+cleanTitle(st.country||'Kraj nieznany')+' | '+(st.global?'Globalna':'Lokalna')+' | '+st.id);}
+    if(name==='radiogenres'||name==='radiocountries'){const k=name==='radiogenres'?'genre':'country';return safeReply([...new Set(radios.list(gid).map(s=>s[k]).filter(Boolean))].sort().join(', ').slice(0,1800)||'Brak danych.');}
+    if(name==='radiocount')return safeReply('Globalne: '+radios.globalList().length+' | Lokalne: '+radios.search(gid,'','','','local').length);
+    if(name==='radionow'){const s=currentRadio();return safeReply('📻 '+cleanTitle(s.current.title)+'\n🎵 '+(s.radioTitle?cleanTitle(s.radioTitle):'Stacja nie przekazała tytułu.'));}
+    if(name==='radiobuffer')return safeReply(live?'Bufor: '+Math.round((live.audioBuffer?.readableLength||0)/(live.audioBytesPerMs||192))+' ms | cel: '+(live.bufferTargetMs||0)+' ms | niedobory: '+(live.bufferLow||0):'Brak sesji.');
+    if(name==='audioengine')return safeReply(live?.audioEngine||'Brak aktywnego silnika.');
+    if(name==='audioping')return safeReply(live?'Discord WS: '+(live.connection.ping?.ws??'brak')+' ms | UDP: '+(live.connection.ping?.udp??'brak')+' ms':'Brak sesji.');
+    if(name==='radiostop'||name==='radioreconnect'){const s=currentRadio();if(!sameVoice(interaction,s))throw new Error('Dołącz do kanału bota.');if(name==='radioreconnect'){s.replaceWith({...s.current});return safeReply('Ponowne łączenie.');}if(always247.read(gid)?.mode==='radio'){always247.remove(gid);s.disable247();}s.stopRadio();return safeReply('Radio zatrzymane.');}
     if (name === 'spotify') {
       const sub = interaction.options.getSubcommand();
       if (sub === 'status') {
@@ -335,7 +367,7 @@ client.on(Events.InteractionCreate, async interaction => {
       if (sub === 'list') {
         const entries = radios.list(interaction.guild.id);
         return interaction.reply({ content: entries.length
-          ? '📻 **Dostępne radia:**\n' + entries.map((r,i) => `${i+1}. **${cleanTitle(r.name)}** — ${cleanTitle(r.genre)}`).join('\n')
+          ? '📻 **Dostępne radia:**\n' + entries.slice(0,20).map((r,i) => `${i+1}. **${cleanTitle(r.name)}** — ${cleanTitle(r.genre)}`).join('\n')
           : 'Nie ma jeszcze stacji. Administrator może dodać pierwszą komendą `/radio add`.', ...ephemeral, allowedMentions: {parse: []} });
       }
       if (sub === 'add') {
@@ -356,7 +388,7 @@ client.on(Events.InteractionCreate, async interaction => {
       if (sub === 'now') {
         const s = sessions.get(interaction.guild.id);
         return interaction.reply({ content: s?.current?.kind === 'radio'
-          ? `📻 Teraz gra: **${cleanTitle(s.current.title)}**` : 'Obecnie nie jest odtwarzana stacja radiowa.', ...ephemeral });
+          ? `📻 Teraz gra: **${cleanTitle(s.current.title)}**\n🎵 ${s.radioTitle ? cleanTitle(s.radioTitle) : 'Brak metadanych utworu'}` : 'Obecnie nie jest odtwarzana stacja radiowa.', ...ephemeral });
       }
       if (sub === 'stop') {
         const s = sessions.get(interaction.guild.id);
@@ -439,7 +471,7 @@ client.on(Events.InteractionCreate, async interaction => {
       const [yt, ff] = await Promise.all([probeTool(getYtdlpPath(), ['--version']), probeTool(getFFmpegPath(), ['-version'])]);
       const s = sessions.get(interaction.guild.id);
       const lines = [
-        '🛠️ **BOBER RADIO 24/7 5.1 — Diagnostyka audio i 24/7**',
+        '🛠️ **BOBER RADIO 24/7 6.0 — Diagnostyka audio i 24/7**',
         `Wersja uruchomiona: **${require('../package.json').version}**`,
         `Przypisane źródła alternatywne: **${alternatives.list(interaction.guild.id).length}**`,
         `Katalogi: Audius ${process.env.AUDIUS_ENABLED==='0'?'wyłączony':'włączony'}; Jamendo ${process.env.JAMENDO_CLIENT_ID?'skonfigurowany':'wymaga Client ID'}`,
@@ -484,7 +516,7 @@ client.on(Events.InteractionCreate, async interaction => {
     }
     if (name === 'stats') {
       const active = [...sessions.values()];
-      return interaction.reply({content: '📊 **BOBER RADIO 24/7 5.1**\nSerwery: '+client.guilds.cache.size+'\nSesje: '+active.length+'\nGrające: '+active.filter(s=>s.player.state.status==='playing').length+'\nRSS Node: '+Math.round(process.memoryUsage().rss/1048576)+' MB\nUptime: '+Math.floor(process.uptime()/60)+' min',...ephemeral});
+      return interaction.reply({content: '📊 **BOBER RADIO 24/7 6.0**\nSerwery: '+client.guilds.cache.size+'\nSesje: '+active.length+'\nGrające: '+active.filter(s=>s.player.state.status==='playing').length+'\nRSS Node: '+Math.round(process.memoryUsage().rss/1048576)+' MB\nUptime: '+Math.floor(process.uptime()/60)+' min',...ephemeral});
     }
     if (name === 'premium') {
       const ids = new Set((process.env.PREMIUM_GUILD_IDS || '').split(',').map(s=>s.trim()).filter(Boolean));
@@ -635,6 +667,7 @@ client.on(Events.InteractionCreate, async interaction => {
       const v = interaction.options.getInteger('level', true);
       s.volume = v;
       if (s.resource?.volume) s.resource.volume.setVolume(v / 100);
+      else if(s.audioEngine==='Native Opus' && s.current) s.replaceWith({...s.current});
       return interaction.reply(`🔉 Głośność: ${v}%`);
     }
   } catch (error) {
