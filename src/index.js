@@ -28,7 +28,7 @@ if (!token || token.startsWith('NOWY_TOKEN') || token.startsWith('WPISZ_')) {
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
 const ephemeral = { flags: MessageFlags.Ephemeral };
 const help = [
-  '**🎵 BOBER MUSIC BOT 4.0 — MEGA MUSIC UPDATE**',
+  '**🎵 BOBER RADIO 24/7 — 5.1**',
   '`/play source:<link YouTube / tytuł / radio / demo.wav>`',
   '`/search query:<tytuł>` — znajdź utwór na YouTube',
   '`/panel` — przyciski ⏸️ ▶️ ⏭️ ⏹️',
@@ -60,14 +60,14 @@ const help = [
 function musicEmbed(session) {
   const title = cleanTitle(session?.current?.title || 'Brak utworu');
   const lines = (session?.queue || []).slice(0, 5).map((t,i) => (i+1)+'. '+cleanTitle(t.title));
-  return new EmbedBuilder().setColor(0x7950f2).setTitle('BOBER MUSIC • 5.0')
+  return new EmbedBuilder().setColor(0x7950f2).setTitle('BOBER RADIO 24/7 • 5.1')
     .setDescription('**Teraz gra**\n' + title)
     .addFields(
       {name:'Odtwarzacz',value:String(session?.player.state.status || 'idle'),inline:true},
       {name:'Głośność',value:String(session?.volume ?? 100)+'%',inline:true},
       {name:'Loop',value:String(session?.repeatMode || 'off'),inline:true},
       {name:'Kolejka ('+(session?.queue.length || 0)+')',value:lines.join('\n').slice(0,1000)||'Pusta'}
-    ).setFooter({text:'BOBER • Music Experience'});
+    ).setFooter({text:'BOBER RADIO 24/7 • Music & Radio'});
 }
 function controls() {
   return [new ActionRowBuilder().addComponents(
@@ -93,7 +93,7 @@ function radioPanel(guildId) {
   const actions = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('bm2:radio:stop').setLabel('Zatrzymaj radio').setEmoji('⏹️').setStyle(ButtonStyle.Danger)
   );
-  return { content: `📻 **BOBER RADIO CENTER 2.4** — ${stations.length} stacji\nWybierz stację poniżej. Musisz być na kanale głosowym.`, components: [choose, actions] };
+  return { content: `📻 **BOBER RADIO 24/7 • Centrum stacji** — ${stations.length} stacji\nWybierz stację poniżej. Musisz być na kanale głosowym.`, components: [choose, actions] };
 }
 function adminOnly(interaction) {
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) throw new Error('Dodawanie i usuwanie stacji wymaga uprawnienia Zarządzanie serwerem.');
@@ -198,7 +198,7 @@ function check247() {
   for (const saved of always247.list()) void ensure247Running(saved);
 }
 client.once(Events.ClientReady, c => {
-  console.log(`✅ BOBER MUSIC BOT 5.0 MUSIC EXPERIENCE online: ${c.user.tag}`);
+  console.log(`✅ BOBER RADIO 24/7 5.1 online: ${c.user.tag}`);
   setTimeout(check247, 1500).unref?.();
   setInterval(check247, 60_000).unref?.();
 });
@@ -264,7 +264,7 @@ client.on(Events.InteractionCreate, async interaction => {
           result.type === 'format' ? '⚠️ BRAK FORMATU AUDIO' :
           '⚠️ NIEUDANY TEST';
         const lines = [
-          '🧪 **BOBER MUSIC BOT — test YouTube z hostingu**',
+          '🧪 **BOBER RADIO 24/7 — test YouTube z hostingu**',
           'Wynik: **' + category + '**',
           'Klient: ' + cleanTitle(result.client),
           'Wymuszone IPv4: **' + (result.ipv4 ? 'tak' : 'nie') + '**',
@@ -439,7 +439,7 @@ client.on(Events.InteractionCreate, async interaction => {
       const [yt, ff] = await Promise.all([probeTool(getYtdlpPath(), ['--version']), probeTool(getFFmpegPath(), ['-version'])]);
       const s = sessions.get(interaction.guild.id);
       const lines = [
-        '🛠️ **BOBER MUSIC BOT 5.0 — Diagnostyka audio i 24/7**',
+        '🛠️ **BOBER RADIO 24/7 5.1 — Diagnostyka audio i 24/7**',
         `Wersja uruchomiona: **${require('../package.json').version}**`,
         `Przypisane źródła alternatywne: **${alternatives.list(interaction.guild.id).length}**`,
         `Katalogi: Audius ${process.env.AUDIUS_ENABLED==='0'?'wyłączony':'włączony'}; Jamendo ${process.env.JAMENDO_CLIENT_ID?'skonfigurowany':'wymaga Client ID'}`,
@@ -484,7 +484,7 @@ client.on(Events.InteractionCreate, async interaction => {
     }
     if (name === 'stats') {
       const active = [...sessions.values()];
-      return interaction.reply({content: '📊 **BOBER 5.0**\nSerwery: '+client.guilds.cache.size+'\nSesje: '+active.length+'\nGrające: '+active.filter(s=>s.player.state.status==='playing').length+'\nRSS Node: '+Math.round(process.memoryUsage().rss/1048576)+' MB\nUptime: '+Math.floor(process.uptime()/60)+' min',...ephemeral});
+      return interaction.reply({content: '📊 **BOBER RADIO 24/7 5.1**\nSerwery: '+client.guilds.cache.size+'\nSesje: '+active.length+'\nGrające: '+active.filter(s=>s.player.state.status==='playing').length+'\nRSS Node: '+Math.round(process.memoryUsage().rss/1048576)+' MB\nUptime: '+Math.floor(process.uptime()/60)+' min',...ephemeral});
     }
     if (name === 'premium') {
       const ids = new Set((process.env.PREMIUM_GUILD_IDS || '').split(',').map(s=>s.trim()).filter(Boolean));
@@ -505,7 +505,7 @@ client.on(Events.InteractionCreate, async interaction => {
     if (name === 'panel') {
       const session = sessions.get(interaction.guild.id);
       if (!session) return interaction.reply({ content: 'Najpierw użyj `/play`.', ...ephemeral });
-      return interaction.reply({ content: `🎚️ **BOBER 4.0 — Panel muzyczny**\n▶️ Teraz: **${cleanTitle(session.current?.title || 'cisza')}**\n🎼 Oczekuje: ${session.queue.length}\n🔁 Powtarzanie: ${session.repeatMode}`, components: controls(), allowedMentions: { parse: [] } });
+      return interaction.reply({ content: `🎚️ **BOBER RADIO 24/7 — Panel muzyczny**\n▶️ Teraz: **${cleanTitle(session.current?.title || 'cisza')}**\n🎼 Oczekuje: ${session.queue.length}\n🔁 Powtarzanie: ${session.repeatMode}`, components: controls(), allowedMentions: { parse: [] } });
     }
     if (name === 'kolejka') {
       const s = sessions.get(interaction.guild.id);
