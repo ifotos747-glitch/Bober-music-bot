@@ -15,7 +15,7 @@ const commands = [
   new SlashCommandBuilder().setName('files').setDescription('Lista plików audio w music/'),
   new SlashCommandBuilder().setName('volume').setDescription('Głośność muzyki')
     .addIntegerOption(o => o.setName('level').setDescription('Od 0 do 200%').setMinValue(0).setMaxValue(200).setRequired(true)),
-  new SlashCommandBuilder().setName('help').setDescription('Pomoc Bober Music Bot 4.0'),
+  new SlashCommandBuilder().setName('help').setDescription('Pomoc BOBER RADIO 24/7'),
   new SlashCommandBuilder().setName('panel').setDescription('Wyświetl przyciski sterowania muzyką'),
   new SlashCommandBuilder().setName('autodj').setDescription('Automatycznie odtwarzaj pliki music/')
     .addStringOption(o => o.setName('mode').setDescription('Włącz lub wyłącz AutoDJ')
@@ -28,7 +28,7 @@ const commands = [
     .addSubcommand(s => s.setName('list').setDescription('Lista zapisanych playlist'))
     .addSubcommand(s => s.setName('delete').setDescription('Usuń zapisaną playlistę')
       .addStringOption(o => o.setName('name').setDescription('Nazwa playlisty').setRequired(true))),
-  new SlashCommandBuilder().setName('radio').setDescription('Centrum stacji radiowych Bober Music Bot')
+  new SlashCommandBuilder().setName('radio').setDescription('Centrum stacji radiowych BOBER RADIO 24/7')
     .addSubcommand(s => s.setName('list').setDescription('Pokaż zapisane stacje radiowe'))
     .addSubcommand(s => s.setName('play').setDescription('Odtwórz zapisaną stację na kanale głosowym')
       .addStringOption(o => o.setName('station').setDescription('Nazwa stacji').setRequired(true).setAutocomplete(true)))
@@ -91,7 +91,7 @@ const commands = [
     .addSubcommand(s => s.setName('playlisty').setDescription('Lista playlist konta (administrator)'))
     .addSubcommand(s => s.setName('diagnoza').setDescription('Test audio YouTube z IP hostingu (administrator)')
       .addStringOption(o => o.setName('link').setDescription('Publiczny link do filmu YouTube (opcjonalnie)'))),
-  new SlashCommandBuilder().setName('kolejka').setDescription('BOBER 4.0 — zarządzanie oczekującymi utworami')
+  new SlashCommandBuilder().setName('kolejka').setDescription('BOBER RADIO 24/7 — zarządzanie oczekującymi utworami')
     .addSubcommand(s => s.setName('usun').setDescription('Usuń utwór z kolejki (nie przerywa aktualnego)')
       .addIntegerOption(o => o.setName('numer').setDescription('Numer w /queue').setMinValue(1).setMaxValue(100).setRequired(true)))
     .addSubcommand(s => s.setName('przenies').setDescription('Przesuń utwór na inną pozycję')
@@ -99,18 +99,18 @@ const commands = [
       .addIntegerOption(o => o.setName('na').setDescription('Nowa pozycja').setMinValue(1).setMaxValue(100).setRequired(true)))
     .addSubcommand(s => s.setName('tasuj').setDescription('Losowo przetasuj oczekujące utwory'))
     .addSubcommand(s => s.setName('wyczysc').setDescription('Usuń oczekujące utwory, nie przerywaj bieżącego')),
-  new SlashCommandBuilder().setName('powtorz').setDescription('BOBER 4.0 — powtarzanie utworów w sesji')
+  new SlashCommandBuilder().setName('powtorz').setDescription('BOBER RADIO 24/7 — powtarzanie utworów w sesji')
     .addStringOption(o => o.setName('tryb').setDescription('Wyłącz, powtarzaj utwór lub całą kolejkę')
       .addChoices({ name: 'Wyłączone', value: 'off' },
         { name: 'Jeden utwór', value: 'one' }, { name: 'Cała kolejka', value: 'all' })),
-  new SlashCommandBuilder().setName('ulubione').setDescription('BOBER 4.0 — Twoje prywatne ulubione na tym serwerze')
+  new SlashCommandBuilder().setName('ulubione').setDescription('BOBER RADIO 24/7 — Twoje prywatne ulubione na tym serwerze')
     .addSubcommand(s => s.setName('dodaj').setDescription('Zapisz aktualnie odtwarzany utwór'))
     .addSubcommand(s => s.setName('lista').setDescription('Wyświetl swoje ulubione utwory'))
     .addSubcommand(s => s.setName('graj').setDescription('Dodaj ulubiony utwór do kolejki')
       .addIntegerOption(o => o.setName('numer').setDescription('Numer z /ulubione lista').setMinValue(1).setMaxValue(30).setRequired(true)))
     .addSubcommand(s => s.setName('usun').setDescription('Usuń utwór ze swoich ulubionych')
       .addIntegerOption(o => o.setName('numer').setDescription('Numer z /ulubione lista').setMinValue(1).setMaxValue(30).setRequired(true))),
-  new SlashCommandBuilder().setName('music').setDescription('Nowoczesny panel muzyczny BOBER 5.0'),
+  new SlashCommandBuilder().setName('music').setDescription('Nowoczesny panel muzyczny BOBER RADIO 24/7'),
   new SlashCommandBuilder().setName('stats').setDescription('Statystyki aktywnych sesji i wydajności bota'),
   new SlashCommandBuilder().setName('loop').setDescription('Ustaw powtarzanie').addStringOption(o => o.setName('mode').setDescription('Tryb').setRequired(true).addChoices({name:'Off',value:'off'},{name:'Track',value:'one'},{name:'Queue',value:'all'})),
   new SlashCommandBuilder().setName('shuffle').setDescription('Przetasuj kolejkę'),
