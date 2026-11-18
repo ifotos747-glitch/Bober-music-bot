@@ -23,12 +23,12 @@ for (const [filename, marker] of required) {
   const absolute = path.join(__dirname, filename);
   if (!fs.existsSync(absolute) || !fs.readFileSync(absolute, 'utf8').includes(marker)) {
     console.error(`❌ STARA LUB NIEPEŁNA AKTUALIZACJA: ${filename}`);
-    console.error('⛔ Rozpakuj ponownie repozytorium GitHub radio-5.1 lub ZIP 5.1 bezpośrednio w głównym katalogu hostingu i NADPISZ pliki src/*.js i index.js.');
+    console.error('⛔ Rozpakuj ponownie repozytorium GitHub radio-6.0 lub ZIP 6.0 bezpośrednio w głównym katalogu hostingu i NADPISZ pliki src/*.js i index.js.');
     process.exit(1);
   }
 }
 console.log('🔧 WISPBYTE START FIX 1');
-console.log('🔧 WISPBYTE SYNTAX CHECK 4.3.3');
+console.log('🔧 WISPBYTE SYNTAX CHECK 6.0');
 const { spawnSync } = require('node:child_process');
 const checkFiles = [
   ...fs.readdirSync(path.join(__dirname, 'src')).filter(name => name.endsWith('.js')).map(name => path.join('src', name)),
