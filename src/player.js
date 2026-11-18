@@ -17,6 +17,36 @@ const effectsStore = require('./effects');
 const queueTools = require('./queue-tools');
 const TEST_OGG_FILE = path.join(MUSIC_DIR, 'test-dzwiek.ogg'); // diag-ogg-opus-v2.2
 
+
+// ICY marks metadata blocks every metaint audio bytes. Strip those blocks before decoding.
+function icyTransform(interval, onTitle) {
+  let audioLeft=interval, metaLeft=0, metadata=[];
+  return new Transform({transform(chunk, encoding, callback){
+    try {
+      let i=0;
+      while(i<chunk.length){
+        if(audioLeft>0){
+          const count=Math.min(audioLeft,chunk.length-i);
+          this.push(chunk.subarray(i,i+count));i+=count;audioLeft-=count;
+        } else if(metaLeft>0){
+          const count=Math.min(metaLeft,chunk.length-i);
+          metadata.push(chunk.subarray(i,i+count));i+=count;metaLeft-=count;
+          if(!metaLeft){
+            const raw=Buffer.concat(metadata).toString('utf8').replace(/\0+$/,'');
+            const match=raw.match(/StreamTitle='(.*?)';/s);
+            if(match && match[1].trim()) onTitle(match[1].trim().slice(0,180));
+            metadata=[];audioLeft=interval;
+          }
+        } else {
+          metaLeft=chunk[i++]*16;
+          if(!metaLeft)audioLeft=interval;
+        }
+      }
+      callback();
+    }catch(e){callback(e);}
+  }});
+}
+
 const sessions = new Map();
 const lastGuildErrors = new Map();
 const MAX_QUEUE = 100;
@@ -43,6 +73,11 @@ class MusicSession {
     this.ffmpegProcess = null;
     this.radioAbort = null;
     this.radioInput = null;
+    this.radioMetadata = null;
+    this.radioTitle = null;
+    this.audioEngine = null;
+    this.bufferLow = 0;
+    this.radioExtraBuffer = 0;
     this.audioBuffer = null;
     this.audioMeter = null;
     this.audioMonitor = null;
@@ -145,6 +180,8 @@ class MusicSession {
     this.audioBuffer = null;
     this.radioAbort?.abort();
     this.radioAbort = null;
+    this.radioMetadata?.destroy();
+    this.radioMetadata = null;
     this.radioInput?.destroy();
     this.radioInput = null;
     for (const prop of ['ytProcess', 'ffmpegProcess']) {
@@ -278,10 +315,13 @@ class MusicSession {
         : track.kind === 'stream'
           ? ['-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '2', '-rw_timeout', '15000000', '-i', track.source]
           : ['-i', 'pipe:0'];
+    this.radioTitle = null;
+    const nativeOpus = track.kind === 'radio' && process.env.RADIO_NATIVE_OPUS === '1' && this.volume === 100 && !track.forcePCM;
+    this.audioEngine = nativeOpus ? 'Native Opus' : 'PCM / Discord Opus';
     const filters = effectsStore.makeFilters(this.effects);
     const args = ['-nostdin', '-hide_banner', '-loglevel', track.kind === 'radio' ? 'warning' : 'error', ...inputArgs,
       '-vn', '-map', '0:a:0', '-ac', '2', '-ar', '48000',
-      ...(filters.length ? ['-af', filters.join(',')] : []), '-f', 's16le', 'pipe:1'];
+      ...(filters.length ? ['-af', filters.join(',')] : []), ...(nativeOpus ? ['-c:a','libopus','-application','audio','-b:a','128k','-vbr','off','-frame_duration','20','-page_duration','20000','-f','ogg'] : ['-f','s16le']), 'pipe:1'];
     if (track.kind === 'radio') console.log(`[RADIO FIX 4.2 ${this.guildId}] Start: ${cleanTitle(track.title)} | host: ${new URL(track.source).hostname}`);
     const executable = track.kind === 'radio' ? (process.env.RADIO_FFMPEG_PATH?.trim() || getFFmpegPath()) : getFFmpegPath();
     if (track.kind === 'radio') console.log(`[RADIO SAFE 4.2.1] FFmpeg: ${executable}`);
@@ -305,6 +345,7 @@ class MusicSession {
       if (track.kind === 'radio') console.log(`[RADIO ${this.guildId}] FFmpeg exit=${code} signal=${signal || '-'} PCM=${audioBytes} B; ${scrubErrors(ffTail) || 'brak stderr'}`);
       if (this.closed || this.ffmpegProcess !== ff || ff.killed) return;
       if (track.kind === 'radio' && signal === 'SIGSEGV') console.error('[RADIO SAFE 4.2.1] Awaria natywna FFmpeg w dekoderze. Ustaw RADIO_FFMPEG_PATH na alternatywny działający plik FFmpeg, jeśli dostępny.');
+      if (track.kind === 'radio' && nativeOpus && audioBytes === 0 && (track.radioRetry || 0) < 2) track.forcePCM = true;
       if (track.kind === 'radio' && audioBytes === 0) return this.failTrack(`FFmpeg radio: brak audio (exit=${code}, signal=${signal || '-'}). ${scrubErrors(ffTail) || 'Brak komunikatu FFmpeg.'}`, track);
       if (code !== 0) this.failTrack(`FFmpeg: ${scrubErrors(ffTail) || 'zakończono z kodem ' + code}`, track);
     });
@@ -320,7 +361,7 @@ class MusicSession {
       console.log('[RADIO PIPE 4.2.2] Node HTTP -> FFmpeg stdin');
       fetch(track.source, {
         signal: controller.signal, redirect: 'follow',
-        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': '*/*', 'Icy-MetaData': '0', 'Accept-Encoding': 'identity' },
+        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': '*/*', 'Icy-MetaData': '1', 'Accept-Encoding': 'identity' },
       }).then(response => {
         if (!active()) { void response.body?.cancel().catch(() => {}); return; }
         const type = response.headers.get('content-type') || '';
@@ -336,7 +377,13 @@ class MusicSession {
           if (!inputBytes) console.log(`[RADIO HTTP ${this.guildId}] Pierwsze dane wejściowe: ${chunk.length} B`);
           inputBytes += chunk.length;
         });
-        input.pipe(ff.stdin);
+        const interval=Number(response.headers.get('icy-metaint'));
+        if(Number.isSafeInteger(interval)&&interval>0&&interval<=16777216){
+          const parser=icyTransform(interval,title=>{if(active() && this.radioTitle!==title){this.radioTitle=title;console.log('[RADIO ICY] '+cleanTitle(title));}});
+          this.radioMetadata=parser;
+          parser.on('error',e=>{if(active())this.failTrack('Radio ICY: '+e.message,track);});
+          input.pipe(parser).pipe(ff.stdin);
+        }else input.pipe(ff.stdin);
       }).catch(e => { if (active()) this.failTrack('Radio HTTP: ' + scrubErrors(e.message), track); });
     }
 
@@ -363,8 +410,12 @@ class MusicSession {
       ff.stdin.on('error', () => {}); // EPIPE po pominięciu utworu jest normalny.
     }
     const buffered = track.kind === 'radio' || track.kind === 'youtube';
-    const targetMs = track.kind === 'radio' ? audioBufferMs('RADIO_BUFFER_MS', 3000) : audioBufferMs('YOUTUBE_BUFFER_MS', 8000);
-    const targetBytes = Math.ceil(targetMs * 192);
+    const targetMs = track.kind === 'radio' ? Math.min(10000,audioBufferMs('RADIO_BUFFER_MS', 3000)+this.radioExtraBuffer) : audioBufferMs('YOUTUBE_BUFFER_MS', 8000);
+    this.bufferTargetMs=targetMs;
+    this.bufferLow=0;
+    const bytesPerMs=nativeOpus?16:192;
+    this.audioBytesPerMs=bytesPerMs;
+    const targetBytes = Math.ceil(targetMs * bytesPerMs);
     const buffer = buffered ? new PassThrough({ highWaterMark: targetBytes + 65536 }) : null;
     if (buffer) {
       this.audioBuffer = buffer;
@@ -374,18 +425,20 @@ class MusicSession {
     const start = () => {
       if (this.closed || this.current !== track || this.ffmpegProcess !== ff) return;
       this.resource = createAudioResource(buffer || meter, {
-        inputType: StreamType.Raw, inlineVolume: true, metadata: track,
+        inputType: nativeOpus ? StreamType.OggOpus : StreamType.Raw, inlineVolume: !nativeOpus, metadata: track,
       });
-      this.resource.volume.setVolume(this.volume / 100);
+      this.resource.volume?.setVolume(this.volume / 100);
       this.player.play(this.resource);
       if (buffer) {
-        let low = 0;
+        let low = 0, ticks=0, healthy=0;
         this.audioMonitor = setInterval(() => {
           if (this.current !== track || this.audioBuffer !== buffer) return;
-          const ms = Math.round(buffer.readableLength / 192);
-          if (ms < 100 && !buffer.writableEnded) low++;
+          const ms = Math.round(buffer.readableLength / bytesPerMs);
+          if (ms < 100 && !buffer.writableEnded) {low++;healthy=0;if(track.kind==='radio'&&low%3===0)this.radioExtraBuffer=Math.min(5000,this.radioExtraBuffer+500);} else if(ms>1000){healthy++;if(track.kind==='radio'&&healthy===60)this.radioExtraBuffer=Math.max(0,this.radioExtraBuffer-500);}
+          this.bufferLow=low;
+          if(++ticks%10!==0)return;
           console.log(`[AUDIO STABILITY 4.3 ${this.guildId}] ${track.kind} | buffer=${ms}ms | low=${low} | ping=${this.connection.ping?.ws ?? '-'}ms | loopP99=${(eventDelay.percentile(99)/1e6).toFixed(1)}ms | RSS=${Math.round(process.memoryUsage().rss/1048576)}MB`);
-        }, 10000);
+        }, 1000);
         this.audioMonitor.unref?.();
       }
     };
@@ -398,7 +451,7 @@ class MusicSession {
         started = true;
         buffer.removeListener('readable', maybeStart);
         buffer.removeListener('finish', maybeStart);
-        console.log(`[AUDIO STABILITY 4.3] Start ${track.kind}; prebuffer=${Math.round(buffer.readableLength/192)}ms`);
+        console.log(`[AUDIO STABILITY 4.3] Start ${track.kind}; prebuffer=${Math.round(buffer.readableLength/bytesPerMs)}ms`);
         start();
       };
       buffer.on('readable', maybeStart);
