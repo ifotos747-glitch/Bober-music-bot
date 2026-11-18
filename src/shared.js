@@ -116,6 +116,23 @@ const commands = [
   new SlashCommandBuilder().setName('shuffle').setDescription('Przetasuj kolejkę'),
   new SlashCommandBuilder().setName('clear').setDescription('Wyczyść oczekującą kolejkę'),
   new SlashCommandBuilder().setName('premium').setDescription('Informacja o lokalnym planie Premium serwera'),
+  new SlashCommandBuilder().setName("radiosearch").setDescription("Wyszukaj stacje globalne i lokalne") .addStringOption(o=>o.setName('query').setDescription('Nazwa, gatunek lub kraj')).addStringOption(o=>o.setName('genre').setDescription('Gatunek')).addStringOption(o=>o.setName('country').setDescription('Kraj')).addStringOption(o=>o.setName('scope').setDescription('Zakres').addChoices({name:'Globalne',value:'global'},{name:'Lokalne',value:'local'},{name:'Wszystkie',value:'all'})).addIntegerOption(o=>o.setName('page').setDescription('Strona').setMinValue(1)),
+  new SlashCommandBuilder().setName("radioglobal").setDescription("Katalog globalny").addIntegerOption(o=>o.setName('page').setDescription('Strona').setMinValue(1)),
+  new SlashCommandBuilder().setName("radiolocal").setDescription("Katalog lokalny").addIntegerOption(o=>o.setName('page').setDescription('Strona').setMinValue(1)),
+  new SlashCommandBuilder().setName("radioaddglobal").setDescription("Dodaj globalną stację (operator)").addStringOption(o=>o.setName('name').setDescription('Nazwa').setRequired(true)).addStringOption(o=>o.setName('url').setDescription('URL audio').setRequired(true)).addStringOption(o=>o.setName('genre').setDescription('Gatunek')).addStringOption(o=>o.setName('country').setDescription('Kraj')),
+  new SlashCommandBuilder().setName("radioremoveglobal").setDescription("Usuń globalną stację (operator)").addStringOption(o=>o.setName('station').setDescription('ID lub nazwa').setRequired(true)),
+  new SlashCommandBuilder().setName("radiopublish").setDescription("Udostępnij lokalną stację globalnie (operator)").addStringOption(o=>o.setName('station').setDescription('ID lub nazwa').setRequired(true)),
+  new SlashCommandBuilder().setName("radioplay").setDescription("Graj stację z katalogu").addStringOption(o=>o.setName('station').setDescription('ID lub nazwa').setRequired(true).setAutocomplete(true)),
+  new SlashCommandBuilder().setName("radiostop").setDescription("Zatrzymaj radio i jego tryb 24/7"),
+  new SlashCommandBuilder().setName("radionow").setDescription("Aktualny utwór radia i metadane ICY"),
+  new SlashCommandBuilder().setName("radiogenres").setDescription("Gatunki stacji"),
+  new SlashCommandBuilder().setName("radiocountries").setDescription("Kraje stacji"),
+  new SlashCommandBuilder().setName("radiocount").setDescription("Liczba stacji lokalnych i globalnych"),
+  new SlashCommandBuilder().setName("radiobuffer").setDescription("Stan bufora audio"),
+  new SlashCommandBuilder().setName("audioengine").setDescription("Bieżący silnik audio"),
+  new SlashCommandBuilder().setName("audioping").setDescription("Opóźnienia połączenia głosowego"),
+  new SlashCommandBuilder().setName("radioreconnect").setDescription("Połącz ponownie aktualne radio"),
+  new SlashCommandBuilder().setName("radiostation").setDescription("Informacje o stacji").addStringOption(o=>o.setName('station').setDescription('ID lub nazwa').setRequired(true).setAutocomplete(true)),
   new SlashCommandBuilder().setName('status').setDescription('Stan dźwięku, FFmpeg i YouTube')
 ];
 module.exports = { commands };
