@@ -40,7 +40,39 @@ function validAudioUrl(input) {
   if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Stacja musi używać http lub https.');
   return item.source;
 }
-function list(guildId) { return read(guildId).map(s => ({ ...s })); }
+const globalFile = path.join(STORE_DIR,'radios-global.json');
+function globalList() {
+  if (!fs.existsSync(globalFile)) return [];
+  const data = JSON.parse(fs.readFileSync(globalFile,'utf8'));
+  return Array.isArray(data.stations) ? data.stations.map(s=>({...s,global:true})) : [];
+}
+function writeGlobal(stations) {
+  fs.mkdirSync(STORE_DIR,{recursive:true});
+  const tmp=globalFile+'.'+process.pid+'.tmp';
+  fs.writeFileSync(tmp,JSON.stringify({version:1,stations},null,2),{mode:0o600});
+  fs.renameSync(tmp,globalFile);
+}
+function globalAdd(name,url,genre,country='') {
+  const stations=globalList();
+  const item={id:'g'+randomBytes(6).toString('hex'),name:normalizeName(name),url:validAudioUrl(url),genre:normalizeGenre(genre),country:String(country).trim().slice(0,40)};
+  if(stations.length>=1000) throw new Error('Limit 1000 globalnych stacji.');
+  if(stations.some(s=>s.name.toLowerCase()===item.name.toLowerCase() || s.url===item.url)) throw new Error('Stacja już istnieje w katalogu globalnym.');
+  stations.push(item);writeGlobal(stations);return item;
+}
+function globalRemove(key) {
+ const stations=globalList(), item=stations.find(s=>s.id===key || s.name.toLowerCase()===String(key).toLowerCase());
+ if(!item) throw new Error('Nie znaleziono globalnej stacji.');
+ writeGlobal(stations.filter(s=>s.id!==item.id));return item;
+}
+function list(guildId) { return [...read(guildId).map(s=>({...s})),...globalList()]; }
+function search(guildId,query='',genre='',country='',scope='all') {
+ const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+ const words=norm(query).trim().split(/\s+/).filter(Boolean);
+ return list(guildId).filter(s=>(scope==='all'||(scope==='global'===Boolean(s.global))) &&
+ words.every(w=>norm(s.name+' '+s.genre+' '+(s.country||'')).includes(w)) &&
+ norm(s.genre).includes(norm(genre)) && norm(s.country).includes(norm(country)))
+ .sort((a,b)=>a.name.localeCompare(b.name,'pl'));
+}
 function find(guildId, text) {
   const key = String(text || '').trim().toLocaleLowerCase('pl');
   return list(guildId).find(s => s.id === text || s.name.toLocaleLowerCase('pl') === key) || null;
@@ -58,12 +90,13 @@ function add(guildId, rawName, inputUrl, rawGenre) {
   return { ...station };
 }
 function remove(guildId, text) {
-  const station = find(guildId, text);
+  const key=String(text||'').trim().toLowerCase();
+  const station = read(guildId).find(s=>s.id===text||s.name.toLowerCase()===key);
   if (!station) throw new Error('Nie znaleziono stacji. Sprawdź /radio list.');
   write(guildId, read(guildId).filter(s => s.id !== station.id));
   return station;
 }
 function toTrack(station) {
-  return { kind: 'radio', source: station.url, title: `📻 ${station.name}`, stationId: station.id, radioRetry: 0 };
+  return { kind: 'radio', source: station.url, title: `📻 ${station.name}`, stationId: station.id, radioRetry: 0, stationName: station.name };
 }
-module.exports = { MAX_RADIOS, validAudioUrl, normalizeName, normalizeGenre, list, find, add, remove, toTrack };
+module.exports = { MAX_RADIOS, validAudioUrl, normalizeName, normalizeGenre, list, find, add, remove, toTrack, globalList, globalAdd, globalRemove, search };
