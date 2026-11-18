@@ -1,11 +1,11 @@
-// BOBER MUSIC BOT 4.0 — integralność wdrożenia i bezpieczny start
+// BOBER RADIO 24/7 — integralność wdrożenia i bezpieczny start
 'use strict';
 require('dotenv').config({ path: require('node:path').join(__dirname, '.env') });
 const fs = require('node:fs');
 const path = require('node:path');
 const packageInfo = require('./package.json');
 const required = [
-  ['src/index.js', 'BOBER MUSIC BOT 4.0'],
+  ['src/index.js', 'BOBER RADIO 24/7'],
   ['src/media.js', 'classifyYoutubeFailure'],
   ['src/queue-tools.js', 'function requeueFinished'],
   ['src/youtube-diagnostics.js', 'function summarize'],
@@ -18,12 +18,12 @@ const required = [
   ['src/radios.js', 'radio-catalog-v2.3'],
   ['src/always247.js', "'silent'"],
 ];
-console.log(`🎵 START BOBER MUSIC BOT ${packageInfo.version} | ${__filename}`);
+console.log(`🎵 START BOBER RADIO 24/7 ${packageInfo.version} | ${__filename}`);
 for (const [filename, marker] of required) {
   const absolute = path.join(__dirname, filename);
   if (!fs.existsSync(absolute) || !fs.readFileSync(absolute, 'utf8').includes(marker)) {
     console.error(`❌ STARA LUB NIEPEŁNA AKTUALIZACJA: ${filename}`);
-    console.error('⛔ Rozpakuj ponownie repozytorium GitHub 4.0 lub ZIP 4.0 bezpośrednio w głównym katalogu hostingu i NADPISZ pliki src/*.js i index.js.');
+    console.error('⛔ Rozpakuj ponownie repozytorium GitHub radio-5.1 lub ZIP 5.1 bezpośrednio w głównym katalogu hostingu i NADPISZ pliki src/*.js i index.js.');
     process.exit(1);
   }
 }
