@@ -1,8 +1,8 @@
 {
   "name": "bober-music-bot",
-  "version": "5.1.0",
+  "version": "6.0.0",
   "private": true,
-  "description": "BOBER RADIO 24/7 — Music & Radio Experience",
+  "description": "BOBER RADIO 24/7 — Ultimate Radio",
   "engines": {
     "node": ">=24.17.0"
   },
